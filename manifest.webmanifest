@@ -1,0 +1,16 @@
+{
+  "name": "Bus Times",
+  "short_name": "Bus Times",
+  "description": "Local-first shuttle countdowns, saved routes, and commute reminders.",
+  "start_url": "./index.html#/home",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%2307111f'/%3E%3Ccircle cx='96' cy='76' r='42' fill='%2337d5ff'/%3E%3Cpath d='M54 120h84v24H54z' fill='%2377e0a2'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

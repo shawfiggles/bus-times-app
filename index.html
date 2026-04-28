@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#07111f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Bus Times">
+    <title>Bus Times</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <canvas id="starfield" aria-hidden="true"></canvas>
+
+    <div class="app-shell">
+      <header class="app-header">
+        <a class="brand" href="#/home" aria-label="Bus Times home">
+          <span class="brand-mark"></span>
+          <span>Bus Times</span>
+        </a>
+        <div class="route-pill" id="header-route">No route</div>
+      </header>
+
+      <main class="views">
+        <section class="view active" id="view-home" data-view="home" aria-labelledby="home-title">
+          <div class="hero-copy">
+            <p class="eyebrow">Live commute</p>
+            <h1 id="home-title">Next bus countdown.</h1>
+            <p class="lede" id="home-lede">Your last route and stop open automatically, with the next departure front and center.</p>
+          </div>
+
+          <article class="next-card">
+            <div class="panel-topline">
+              <span id="home-route-chip">No route selected</span>
+              <span id="home-updated">Waiting for PDF</span>
+            </div>
+            <div class="next-time">
+              <span class="label">Next bus in</span>
+              <strong id="countdown">--</strong>
+              <small>Departs at <span id="next-time">--:--</span></small>
+            </div>
+            <div class="next-stop">
+              <span class="label">Departure stop</span>
+              <strong id="active-stop-name">--</strong>
+              <small id="distance-readout">Select or set stop locations</small>
+            </div>
+            <div class="commute-advice" id="commute-advice">
+              <strong>Set stop locations for leave-now guidance.</strong>
+              <span>Use nearest stop to estimate walking time.</span>
+            </div>
+            <div class="route-map" id="route-map" aria-label="Route map"></div>
+            <div class="arrival-list" id="arrival-list" aria-label="Downstream arrival times"></div>
+            <div class="stop-switcher" id="stop-switcher" role="group" aria-label="Choose departure stop"></div>
+          </article>
+
+          <div class="quick-actions">
+            <button class="button secondary" id="locate-button" type="button">Use nearest stop</button>
+            <a class="button primary" href="#/upload">Upload route PDF</a>
+          </div>
+
+          <section class="mini-section" aria-labelledby="upcoming-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Following</p>
+                <h2 id="upcoming-title">Upcoming departures</h2>
+              </div>
+              <a href="#/schedule">Full schedule</a>
+            </div>
+            <div class="upcoming-grid" id="upcoming-grid"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-routes" data-view="routes" aria-labelledby="routes-title">
+          <div class="page-heading">
+            <p class="eyebrow">Route library</p>
+            <h1 id="routes-title">Saved routes</h1>
+            <p>Switch routes without uploading again. The last selected route opens automatically next time.</p>
+          </div>
+          <div class="route-list" id="route-list"></div>
+        </section>
+
+        <section class="view" id="view-upload" data-view="upload" aria-labelledby="upload-title">
+          <div class="page-heading">
+            <p class="eyebrow">PDF import</p>
+            <h1 id="upload-title">Add or update a route.</h1>
+            <p>Choose a timetable PDF. The app will detect stops, rows, route name, and then ask how to save it.</p>
+          </div>
+
+          <article class="upload-card">
+            <input id="pdf-input" type="file" accept="application/pdf,.pdf">
+            <div class="upload-icon" aria-hidden="true"></div>
+            <strong>Choose route PDF</strong>
+            <span id="upload-status">Supports the Route 07 and Route 1 style PDFs, plus similar stop/time tables.</span>
+          </article>
+
+          <article class="review-card hidden" id="review-card" aria-labelledby="review-title">
+            <p class="eyebrow">Review import</p>
+            <h2 id="review-title">Confirm detected route</h2>
+            <label>
+              Route name
+              <input id="review-route-name" type="text" autocomplete="off">
+            </label>
+            <label>
+              Effective date
+              <input id="review-effective-date" type="text" autocomplete="off">
+            </label>
+            <div class="review-meta" id="review-meta"></div>
+            <div class="stop-editor" id="stop-editor"></div>
+            <div class="save-grid">
+              <label>
+                Save as
+                <select id="save-mode">
+                  <option value="new">New route</option>
+                  <option value="update">Update existing route</option>
+                </select>
+              </label>
+              <label>
+                Existing route
+                <select id="existing-route-select"></select>
+              </label>
+            </div>
+            <div class="sample-table" id="sample-table"></div>
+            <div class="form-actions">
+              <button class="button primary" id="save-upload" type="button">Save route</button>
+              <button class="button secondary" id="cancel-upload" type="button">Cancel</button>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" id="view-schedule" data-view="schedule" aria-labelledby="schedule-title">
+          <div class="page-heading">
+            <p class="eyebrow">Timetable</p>
+            <h1 id="schedule-title">Full schedule</h1>
+            <p id="schedule-summary">Upload or choose a route to view the full table.</p>
+          </div>
+          <div class="table-wrap">
+            <table id="schedule-table">
+              <thead id="schedule-head"></thead>
+              <tbody id="schedule-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="view-settings" data-view="settings" aria-labelledby="settings-title">
+          <div class="page-heading">
+            <p class="eyebrow">Settings</p>
+            <h1 id="settings-title">Stop locations</h1>
+            <p>Save a location for each departure stop. The map uses online tiles when available, with GPS and manual fields as fallback.</p>
+          </div>
+
+          <div class="settings-grid">
+            <div class="location-list" id="location-list"></div>
+            <article class="map-card">
+              <section class="prefs-panel" aria-labelledby="prefs-title">
+                <h2 id="prefs-title">Commute alerts</h2>
+                <div class="coordinate-grid">
+                  <label>
+                    Walking speed
+                    <input id="walking-speed" type="number" min="30" max="140" step="5" inputmode="numeric">
+                  </label>
+                  <label>
+                    Buffer minutes
+                    <input id="buffer-minutes" type="number" min="0" max="20" step="1" inputmode="numeric">
+                  </label>
+                </div>
+                <div class="reminder-grid">
+                  <label><input id="reminder-five" type="checkbox"> 5 min before</label>
+                  <label><input id="reminder-leave" type="checkbox"> Leave-now</label>
+                  <label><input id="reminder-one" type="checkbox"> 1 min before</label>
+                </div>
+                <button class="button secondary compact" id="enable-notifications" type="button">Enable notifications</button>
+                <p class="status-line" id="notification-status">Notifications work best after adding this app to your Home Screen.</p>
+              </section>
+              <form class="search-box" id="location-search-form">
+                <label>
+                  Search address or building
+                  <span class="search-row">
+                    <input id="location-search" type="search" placeholder="e.g. EGHQ, TECOM, Park Zabeel View" autocomplete="off">
+                    <button class="button primary compact" type="submit">Search</button>
+                  </span>
+                </label>
+                <div class="search-results" id="search-results"></div>
+              </form>
+              <div class="map-picker" id="map-picker">
+                <div class="tile-grid" id="tile-grid"></div>
+                <div class="map-pin" aria-hidden="true"></div>
+                <div class="map-hint">Tap the map to move the pin</div>
+              </div>
+              <div class="map-controls">
+                <button class="button secondary compact" id="use-current-location" type="button">Use current GPS</button>
+                <button class="button secondary compact" id="open-map-link" type="button">Open in Maps</button>
+              </div>
+              <div class="nudge-grid" aria-label="Fine tune location">
+                <button type="button" data-nudge="north">North</button>
+                <button type="button" data-nudge="west">West</button>
+                <button type="button" data-nudge="east">East</button>
+                <button type="button" data-nudge="south">South</button>
+              </div>
+              <div class="coordinate-grid">
+                <label>
+                  Latitude
+                  <input id="lat-input" type="number" step="0.000001" inputmode="decimal">
+                </label>
+                <label>
+                  Longitude
+                  <input id="lng-input" type="number" step="0.000001" inputmode="decimal">
+                </label>
+              </div>
+              <div class="form-actions">
+                <button class="button primary" id="save-location" type="button">Save stop location</button>
+                <button class="button secondary" id="clear-location" type="button">Clear</button>
+              </div>
+              <p class="status-line" id="settings-status">Choose a stop to edit its location.</p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="App navigation">
+        <a href="#/home" data-nav="home">Home</a>
+        <a href="#/routes" data-nav="routes">Routes</a>
+        <a href="#/upload" data-nav="upload">Upload</a>
+        <a href="#/schedule" data-nav="schedule">Schedule</a>
+        <a href="#/settings" data-nav="settings">Settings</a>
+      </nav>
+    </div>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
