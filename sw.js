@@ -1,4 +1,4 @@
-const CACHE_NAME = "bus-times-v1";
+const CACHE_NAME = "bus-times-v2";
 const ASSETS = [
   "./",
   "./index.html",
