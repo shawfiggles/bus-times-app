@@ -249,7 +249,7 @@ function activeRoute() {
 
 function departureStops(route = activeRoute()) {
   if (!route) return [];
-  const last = route.stops.at(-1);
+  const last = lastItem(route.stops);
   const first = route.stops[0];
   if (last && first && normalizeName(last.name) === normalizeName(first.name)) {
     return route.stops.slice(0, -1);
@@ -284,6 +284,14 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function lastItem(items) {
+  return items[items.length - 1];
+}
+
 function getTimedRows(route, stopIndex, now = new Date()) {
   if (!route?.rows?.length) return [];
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -306,7 +314,7 @@ function normalizeArrival(row, fieldIndex, departureMinutes) {
 
 function locationBucket(routeId = state.activeRouteId) {
   if (!routeId) return {};
-  state.settings.stopLocationsByRoute[routeId] ||= {};
+  if (!state.settings.stopLocationsByRoute[routeId]) state.settings.stopLocationsByRoute[routeId] = {};
   return state.settings.stopLocationsByRoute[routeId];
 }
 
@@ -319,7 +327,7 @@ function getLastStopIndex(route) {
 
 async function rememberStop(routeId, stopIndex) {
   if (!routeId) return;
-  state.settings.lastStopByRoute ||= {};
+  if (!state.settings.lastStopByRoute) state.settings.lastStopByRoute = {};
   state.settings.lastStopByRoute[routeId] = stopIndex;
   await saveSettings();
 }
@@ -336,9 +344,9 @@ function savedLocationCount(route) {
 
 function commutePrefs(routeId = state.activeRouteId) {
   if (!routeId) return { ...DEFAULT_COMMUTE_PREFS };
-  state.settings.commutePrefsByRoute ||= {};
-  state.settings.commutePrefsByRoute[routeId] ||= structuredClone(DEFAULT_COMMUTE_PREFS);
-  state.settings.commutePrefsByRoute[routeId].reminders ||= structuredClone(DEFAULT_COMMUTE_PREFS.reminders);
+  if (!state.settings.commutePrefsByRoute) state.settings.commutePrefsByRoute = {};
+  if (!state.settings.commutePrefsByRoute[routeId]) state.settings.commutePrefsByRoute[routeId] = cloneJson(DEFAULT_COMMUTE_PREFS);
+  if (!state.settings.commutePrefsByRoute[routeId].reminders) state.settings.commutePrefsByRoute[routeId].reminders = cloneJson(DEFAULT_COMMUTE_PREFS.reminders);
   return state.settings.commutePrefsByRoute[routeId];
 }
 
@@ -631,7 +639,7 @@ function renderCommutePrefs(route) {
   els.reminderLeave.checked = Boolean(prefs.reminders?.leave);
   els.reminderOne.checked = Boolean(prefs.reminders?.one);
   const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
-  state.settings.notificationPrefs ||= {};
+  if (!state.settings.notificationPrefs) state.settings.notificationPrefs = {};
   state.settings.notificationPrefs.permission = permission;
   els.notificationStatus.textContent = permission === "granted"
     ? "Notifications are enabled for this browser."
@@ -759,7 +767,7 @@ async function parsePdf(file) {
   const stopCount = mode(counts);
   if (!stopCount || stopCount < 3) throw new Error("Could not detect the number of stop columns.");
 
-  const headerLine = lines.slice(0, firstTimeLine).filter(Boolean).at(-1);
+  const headerLine = lastItem(lines.slice(0, firstTimeLine).filter(Boolean));
   const footerLines = lines.slice(firstTimeLine).filter((line) => (line.match(TIME_RE) || []).length === 0);
   const routeName = detectRouteName(footerLines, file.name);
   const effectiveDate = detectEffectiveDate(footerLines);
@@ -827,7 +835,7 @@ function parseStops(headerLine, stopCount) {
   }
 
   const first = tokens.shift() || "Stop 1";
-  const last = tokens.at(-1);
+  const last = lastItem(tokens);
   const middleText = last && normalizeName(last) === normalizeName(first) ? tokens.slice(0, -1).join(" ") : tokens.join(" ");
   const middleCount = last && normalizeName(last) === normalizeName(first) ? stopCount - 2 : stopCount - 1;
   const middle = splitEvenly(middleText.split(/\s+/).filter(Boolean), middleCount);
@@ -898,7 +906,7 @@ function findBestRouteMatch(candidate) {
 
 async function savePendingUpload() {
   if (!state.pendingUpload) return;
-  const candidate = structuredClone(state.pendingUpload);
+  const candidate = cloneJson(state.pendingUpload);
   candidate.name = els.reviewRouteName.value.trim() || candidate.name;
   candidate.effectiveDate = els.reviewEffectiveDate.value.trim();
   candidate.stops = [...document.querySelectorAll("[data-stop-name]")].map((input, index) =>
@@ -1336,7 +1344,7 @@ async function enableNotifications() {
     return;
   }
   const permission = await Notification.requestPermission();
-  state.settings.notificationPrefs ||= {};
+  if (!state.settings.notificationPrefs) state.settings.notificationPrefs = {};
   state.settings.notificationPrefs.enabled = permission === "granted";
   state.settings.notificationPrefs.permission = permission;
   await saveSettings();

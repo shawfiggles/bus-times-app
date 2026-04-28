@@ -1,9 +1,9 @@
-const CACHE_NAME = "bus-times-v3";
+const CACHE_NAME = "bus-times-v4";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./script.js?v=pdfjs3-20260428",
+  "./script.js?v=pdfjs3-compat-20260428",
   "./manifest.webmanifest"
 ];
 
