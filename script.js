@@ -227,6 +227,63 @@ function escapeHTML(value) {
   })[char]);
 }
 
+const ICONS = {
+  "arrow-down": `<path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path>`,
+  "arrow-left": `<path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path>`,
+  "arrow-right": `<path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path>`,
+  "arrow-up": `<path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path>`,
+  "bell": `<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>`,
+  "bell-ring": `<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M4 2 2 4"></path><path d="m22 4-2-2"></path>`,
+  "bus": `<path d="M8 6v6"></path><path d="M16 6v6"></path><path d="M6 18h.01"></path><path d="M18 18h.01"></path><path d="M4 11h16"></path><path d="M5 6h14a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a2 2 0 0 1 2-2Z"></path>`,
+  "calendar": `<path d="M8 2v4"></path><path d="M16 2v4"></path><path d="M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect>`,
+  "check": `<path d="m20 6-11 11-5-5"></path>`,
+  "clock": `<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>`,
+  "crosshair": `<circle cx="12" cy="12" r="8"></circle><path d="M22 12h-4"></path><path d="M6 12H2"></path><path d="M12 6V2"></path><path d="M12 22v-4"></path>`,
+  "external-link": `<path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>`,
+  "file-up": `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M12 18v-6"></path><path d="m9 15 3-3 3 3"></path>`,
+  "home": `<path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>`,
+  "list": `<path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path>`,
+  "map-pin": `<path d="M20 10c0 4.5-8 12-8 12S4 14.5 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle>`,
+  "map-pin-check": `<path d="M20 10c0 4.5-8 12-8 12S4 14.5 4 10a8 8 0 1 1 16 0Z"></path><path d="m9 10 2 2 4-4"></path>`,
+  "route": `<circle cx="6" cy="19" r="3"></circle><circle cx="18" cy="5" r="3"></circle><path d="M6 16V8a3 3 0 0 1 3-3h6"></path><path d="M18 8v8a3 3 0 0 1-3 3H9"></path>`,
+  "schedule": `<path d="M8 2v4"></path><path d="M16 2v4"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M3 10h18"></path><path d="M8 14h8"></path><path d="M8 18h5"></path>`,
+  "search": `<circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>`,
+  "settings": `<path d="M4 21v-7"></path><path d="M4 10V3"></path><path d="M12 21v-9"></path><path d="M12 8V3"></path><path d="M20 21v-5"></path><path d="M20 12V3"></path><path d="M2 14h4"></path><path d="M10 8h4"></path><path d="M18 16h4"></path>`,
+  "stop": `<circle cx="12" cy="12" r="7"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path>`,
+  "target": `<circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="M2 12h2"></path><path d="M20 12h2"></path>`,
+  "trash": `<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m19 6-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path>`,
+  "upload": `<path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M20 16v4H4v-4"></path>`,
+  "x": `<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>`
+};
+
+function icon(name, label = "") {
+  const body = ICONS[name] || ICONS.stop;
+  const accessibility = label
+    ? `role="img" aria-label="${escapeHTML(label)}"`
+    : `aria-hidden="true" focusable="false"`;
+  return `<svg class="icon icon-${escapeHTML(name)}" viewBox="0 0 24 24" ${accessibility}>${body}</svg>`;
+}
+
+function iconText(name, text) {
+  return `${icon(name)}<span>${escapeHTML(text)}</span>`;
+}
+
+function hydrateStaticIcons() {
+  document.querySelectorAll("[data-icon]").forEach((node) => {
+    const name = node.dataset.icon;
+    const label = node.getAttribute("aria-label") || node.dataset.iconLabel || node.textContent.trim();
+    if (node.dataset.iconOnly === "true") {
+      node.innerHTML = icon(name, label);
+      return;
+    }
+    if (!label) {
+      node.innerHTML = icon(name);
+      return;
+    }
+    node.innerHTML = iconText(name, label);
+  });
+}
+
 function createId(seed = "route") {
   return `${slug(seed)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -473,7 +530,7 @@ function renderAll() {
 
 function renderShell() {
   const route = activeRoute();
-  els.headerRoute.textContent = route?.name || "No route";
+  els.headerRoute.innerHTML = iconText("bus", route?.name || "No route");
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("active", view.dataset.view === state.activeView);
   });
@@ -489,15 +546,15 @@ function renderHome() {
     state.homeRenderKey = "";
     state.countdownText = "";
     document.body.dataset.homeState = "empty";
-    els.homeRouteChip.textContent = "No route selected";
-    els.homeUpdated.textContent = "Waiting for PDF";
+    els.homeRouteChip.innerHTML = iconText("bus", "No route selected");
+    els.homeUpdated.innerHTML = iconText("calendar", "Waiting for PDF");
     els.activeStopName.textContent = "--";
     els.distanceReadout.textContent = "Upload a route to begin";
     els.nextTime.textContent = "--:--";
     els.countdown.textContent = "Upload a route to begin";
     els.countdownProgressFill.style.width = "0%";
     els.commuteAdvice.classList.remove("compact");
-    els.commuteAdvice.innerHTML = `<strong>No route yet.</strong><span>Upload a PDF to start.</span>`;
+    els.commuteAdvice.innerHTML = `<strong>${icon("upload")}No route yet.</strong><span>Upload a PDF to start.</span>`;
     els.routeMap.innerHTML = "";
     els.arrivalList.innerHTML = "";
     els.stopSwitcher.innerHTML = "";
@@ -512,8 +569,8 @@ function renderHome() {
   const activeStop = route.stops[state.activeStopIndex];
   const next = getTimedRows(route, state.activeStopIndex)[0];
 
-  els.homeRouteChip.textContent = route.name;
-  els.homeUpdated.textContent = route.effectiveDate || formatDate(route.updatedAt);
+  els.homeRouteChip.innerHTML = iconText("bus", route.name);
+  els.homeUpdated.innerHTML = iconText("calendar", route.effectiveDate || formatDate(route.updatedAt));
   els.activeStopName.textContent = activeStop?.shortName || activeStop?.name || "--";
 
   if (!next) {
@@ -524,7 +581,7 @@ function renderHome() {
     els.countdown.textContent = "No times found for this stop";
     els.countdownProgressFill.style.width = "0%";
     els.commuteAdvice.classList.remove("compact");
-    els.commuteAdvice.innerHTML = `<strong>No departure found.</strong><span>Try another stop or update the PDF.</span>`;
+    els.commuteAdvice.innerHTML = `<strong>${icon("clock")}No departure found.</strong><span>Try another stop or update the PDF.</span>`;
     els.routeMap.innerHTML = renderRouteMap(route);
     els.arrivalList.innerHTML = "";
     els.stopSwitcher.innerHTML = stops.map((stop) => `
@@ -562,15 +619,15 @@ function renderHome() {
   els.commuteAdvice.dataset.state = guidance.state;
   els.commuteAdvice.classList.toggle("compact", guidance.state === "Set location");
   els.commuteAdvice.innerHTML = guidance.state === "Set location"
-    ? `<a href="#/settings">Set stop location</a>`
-    : `<strong>${escapeHTML(guidance.state)}: ${escapeHTML(guidance.title)}</strong><span>${escapeHTML(guidance.detail)}</span>`;
+    ? `<a href="#/settings">${icon("map-pin")}<span>Set stop location</span></a>`
+    : `<strong>${icon(guidance.state === "Plenty of time" ? "clock" : "target")}${escapeHTML(guidance.state)}: ${escapeHTML(guidance.title)}</strong><span>${escapeHTML(guidance.detail)}</span>`;
   els.routeMap.innerHTML = renderRouteMap(route);
   const arrivalCards = route.stops
     .slice(state.activeStopIndex + 1)
     .map((stop, downstreamIndex) => {
       const arrival = next.row[stop.index];
       const rideMinutes = normalizeArrival(next.row, stop.index, next.minutes) - next.minutes;
-      return `<div class="${downstreamIndex === 0 ? "next-arrival" : ""}"><span>${downstreamIndex === 0 ? "Next stop: " : ""}${escapeHTML(stop.name)}</span><strong>${arrival}</strong><small>${rideMinutes} min ride</small></div>`;
+      return `<div class="${downstreamIndex === 0 ? "next-arrival" : ""}"><span>${icon("stop")}${downstreamIndex === 0 ? "Next stop: " : ""}${escapeHTML(stop.name)}</span><strong>${arrival}</strong><small>${rideMinutes} min ride</small></div>`;
     })
     .join("") || `<div><span>End of route</span><strong>${next.row[state.activeStopIndex]}</strong><small>No downstream stops</small></div>`;
   els.arrivalList.innerHTML = `<h3 class="mini-heading">Next stops</h3>${arrivalCards}`;
@@ -583,12 +640,12 @@ function renderHome() {
       const armed = Boolean(selectedAlertBucket(route.id)[key]);
       return `
       <article class="${armed ? "armed" : ""}">
-        <span>${escapeHTML(activeStop?.shortName || activeStop?.name || "Stop")}</span>
+        <span>${icon("bus")}${escapeHTML(activeStop?.shortName || activeStop?.name || "Stop")}</span>
         <strong>${row[state.activeStopIndex]}</strong>
         <div class="departure-actions">
           <small>${formatDuration(wait)}</small>
           <button class="alarm-button ${armed ? "active" : ""}" type="button" data-alert-key="${escapeHTML(key)}" aria-label="${armed ? "Remove" : "Set"} reminder for ${row[state.activeStopIndex]}">
-            ${armed ? "Alarm set" : "Alarm"}
+            ${icon(armed ? "bell-ring" : "bell")}${armed ? "Alarm set" : "Alarm"}
           </button>
         </div>
       </article>
@@ -638,25 +695,25 @@ function renderRoutes() {
     return `
     <article class="route-card">
       <div class="topline">
-        <span>${route.rows.length} rows</span>
-        <span>${locations.saved}/${locations.total} stops located</span>
+        <span>${icon("list")}${route.rows.length} rows</span>
+        <span>${icon("map-pin-check")}${locations.saved}/${locations.total} stops located</span>
       </div>
       <div>
         <h2>${escapeHTML(route.name)}</h2>
-        <small>${escapeHTML(route.fileName || "Uploaded PDF")} · Updated ${formatDate(route.updatedAt)}</small>
+        <small>${icon("file-up")}${escapeHTML(route.fileName || "Uploaded PDF")} · Updated ${formatDate(route.updatedAt)}</small>
       </div>
       <small>${escapeHTML(route.stops.map((stop) => stop.shortName || stop.name).join(" → "))}</small>
       <div class="health-list">
-        <span>${route.fileName ? "PDF saved" : "PDF missing"}</span>
-        <span>${route.effectiveDate || "No effective date"}</span>
-        <span>${route.rows.length} departures</span>
+        <span>${icon("file-up")}${route.fileName ? "PDF saved" : "PDF missing"}</span>
+        <span>${icon("calendar")}${route.effectiveDate || "No effective date"}</span>
+        <span>${icon("clock")}${route.rows.length} departures</span>
       </div>
       <div class="route-preview">
-        ${preview.map(({ row, wait }) => `<span>${row[routeStopIndex]} · ${formatDuration(wait)}</span>`).join("") || "<span>No upcoming departures</span>"}
+        ${preview.map(({ row, wait }) => `<span>${icon("clock")}${row[routeStopIndex]} · ${formatDuration(wait)}</span>`).join("") || `<span>${icon("clock")}No upcoming departures</span>`}
       </div>
       <div class="actions">
-        <button class="button primary" type="button" data-select-route="${route.id}">${route.id === state.activeRouteId ? "Current route" : "Use route"}</button>
-        <button class="button secondary compact" type="button" data-delete-route="${route.id}">Delete</button>
+        <button class="button primary" type="button" data-select-route="${route.id}">${icon("route")}${route.id === state.activeRouteId ? "Current route" : "Use route"}</button>
+        <button class="button secondary compact" type="button" data-delete-route="${route.id}">${icon("trash")}Delete</button>
       </div>
     </article>
   `; }).join("");
@@ -673,9 +730,9 @@ function renderUploadReview() {
   els.reviewRouteName.value = pending.name;
   els.reviewEffectiveDate.value = pending.effectiveDate || "";
   els.reviewMeta.innerHTML = `
-    <span>${pending.stops.length} stops</span>
-    <span>${pending.rows.length} rows</span>
-    <span>${escapeHTML(pending.fileName)}</span>
+    <span>${icon("stop")}${pending.stops.length} stops</span>
+    <span>${icon("list")}${pending.rows.length} rows</span>
+    <span>${icon("file-up")}${escapeHTML(pending.fileName)}</span>
   `;
   els.stopEditor.innerHTML = pending.stops.map((stop, index) => `
     <label>
@@ -706,7 +763,7 @@ function renderSchedule() {
   els.scheduleBody.innerHTML = route.rows.map((row) => `
     <tr>${row.map((time, index) => {
       const label = `${index === 0 ? "Depart " : ""}${route.stops[index]?.shortName || route.stops[index]?.name || `Stop ${index + 1}`}`;
-      return `<td data-label="${escapeHTML(label)}">${time}</td>`;
+      return `<td data-label="${escapeHTML(label)}"><span class="schedule-label">${icon(index === 0 ? "bus" : "stop")}<span>${escapeHTML(label)}</span></span><span class="schedule-time">${time}</span></td>`;
     }).join("")}</tr>
   `).join("");
 }
@@ -735,12 +792,12 @@ function renderSettings() {
     return `
       <article class="${stop.index === state.editingStopIndex ? "active" : ""}">
         <button type="button" data-edit-stop="${stop.index}">
-          <strong>${escapeHTML(stop.name)}</strong>
+          <strong>${icon(saved ? "map-pin-check" : "map-pin")}${escapeHTML(stop.name)}</strong>
           <span>${saved ? `${saved.lat.toFixed(6)}, ${saved.lng.toFixed(6)}` : "No saved location"}</span>
         </button>
         ${suggestions.map((suggestion) => `
           <button class="copy-suggestion" type="button" data-copy-location-route="${suggestion.routeId}" data-copy-location-stop="${suggestion.stopId}" data-copy-target-stop="${stop.index}">
-            Copy from ${escapeHTML(suggestion.routeName)}
+            ${icon("map-pin-check")}Copy from ${escapeHTML(suggestion.routeName)}
           </button>
         `).join("")}
       </article>
@@ -827,15 +884,15 @@ function renderSearchResults(results) {
     const query = escapeHTML(state.lastSearchQuery || "");
     els.searchResults.innerHTML = `
       <p>No in-app map result found. Try the external map search below, then copy/adjust the pin here if needed.</p>
-      <button type="button" data-external-search="google"><strong>Search Google Maps</strong><span>${query}</span></button>
-      <button type="button" data-external-search="apple"><strong>Search Apple Maps</strong><span>${query}</span></button>
+      <button type="button" data-external-search="google"><strong>${icon("search")}Search Google Maps</strong><span>${query}</span></button>
+      <button type="button" data-external-search="apple"><strong>${icon("external-link")}Search Apple Maps</strong><span>${query}</span></button>
     `;
     return;
   }
 
   els.searchResults.innerHTML = results.map((result, index) => `
     <button type="button" data-search-result="${index}">
-      <strong>${escapeHTML(result.name)}</strong>
+      <strong>${icon("map-pin")}${escapeHTML(result.name)}</strong>
       <span>${escapeHTML(result.address)}</span>
       <small>${escapeHTML(result.source || "Map search")}${result.distanceLabel ? ` · ${escapeHTML(result.distanceLabel)}` : ""}</small>
     </button>
@@ -1741,6 +1798,7 @@ function initStarfield() {
 }
 
 async function init() {
+  hydrateStaticIcons();
   wireEvents();
   initStarfield();
   await loadState();

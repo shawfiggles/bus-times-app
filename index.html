@@ -37,7 +37,7 @@
               <div class="countdown-progress" aria-hidden="true">
                 <span id="countdown-progress-fill"></span>
               </div>
-              <small>Departs at <span id="next-time">--:--</span></small>
+              <small class="icon-line"><span data-icon="clock">Departs at</span> <span id="next-time">--:--</span></small>
             </div>
             <section class="upcoming-strip" aria-labelledby="upcoming-title">
               <div class="section-heading compact-heading">
@@ -45,7 +45,7 @@
                   <p class="eyebrow">Following</p>
                   <h2 id="upcoming-title">Upcoming departures</h2>
                 </div>
-                <a href="#/schedule">Full schedule</a>
+                <a href="#/schedule" data-icon="schedule">Full schedule</a>
               </div>
               <div class="upcoming-grid" id="upcoming-grid"></div>
             </section>
@@ -64,14 +64,14 @@
           </article>
 
           <div class="quick-actions">
-            <button class="button secondary" id="locate-button" type="button">Use nearest stop</button>
-            <a class="button primary" href="#/upload">Upload route PDF</a>
+            <button class="button secondary" id="locate-button" type="button" data-icon="target">Use nearest stop</button>
+            <a class="button primary" href="#/upload" data-icon="upload">Upload route PDF</a>
           </div>
         </section>
 
         <section class="view" id="view-routes" data-view="routes" aria-labelledby="routes-title">
           <div class="page-heading">
-            <p class="eyebrow">Route library</p>
+            <p class="eyebrow" data-icon="route">Route library</p>
             <h1 id="routes-title">Saved routes</h1>
             <p>Switch routes without uploading again. The last selected route opens automatically next time.</p>
           </div>
@@ -80,20 +80,20 @@
 
         <section class="view" id="view-upload" data-view="upload" aria-labelledby="upload-title">
           <div class="page-heading">
-            <p class="eyebrow">PDF import</p>
+            <p class="eyebrow" data-icon="file-up">PDF import</p>
             <h1 id="upload-title">Add or update a route.</h1>
             <p>Choose a timetable PDF. The app will detect stops, rows, route name, and then ask how to save it.</p>
           </div>
 
           <article class="upload-card">
             <input id="pdf-input" type="file" accept="application/pdf,.pdf">
-            <div class="upload-icon" aria-hidden="true"></div>
+            <div class="upload-icon" aria-hidden="true" data-icon="file-up"></div>
             <strong>Choose route PDF</strong>
-            <span id="upload-status">Choose a route PDF.</span>
+            <span id="upload-status">PDF stays saved after import.</span>
           </article>
 
           <article class="review-card hidden" id="review-card" aria-labelledby="review-title">
-            <p class="eyebrow">Review import</p>
+            <p class="eyebrow" data-icon="check">Review import</p>
             <h2 id="review-title">Confirm detected route</h2>
             <label>
               Route name
@@ -120,15 +120,15 @@
             </div>
             <div class="sample-table" id="sample-table"></div>
             <div class="form-actions">
-              <button class="button primary" id="save-upload" type="button">Save route</button>
-              <button class="button secondary" id="cancel-upload" type="button">Cancel</button>
+              <button class="button primary" id="save-upload" type="button" data-icon="check">Save route</button>
+              <button class="button secondary" id="cancel-upload" type="button" data-icon="x">Cancel</button>
             </div>
           </article>
         </section>
 
         <section class="view" id="view-schedule" data-view="schedule" aria-labelledby="schedule-title">
           <div class="page-heading">
-            <p class="eyebrow">Timetable</p>
+            <p class="eyebrow" data-icon="schedule">Timetable</p>
             <h1 id="schedule-title">Full schedule</h1>
             <p id="schedule-summary">Upload or choose a route to view the full table.</p>
           </div>
@@ -142,7 +142,7 @@
 
         <section class="view" id="view-settings" data-view="settings" aria-labelledby="settings-title">
           <div class="page-heading">
-            <p class="eyebrow">Settings</p>
+            <p class="eyebrow" data-icon="settings">Settings</p>
             <h1 id="settings-title">Stop locations</h1>
             <p>Save a location for each departure stop. The map uses online tiles when available, with GPS and manual fields as fallback.</p>
           </div>
@@ -167,7 +167,7 @@
                   <label><input id="reminder-five" type="checkbox" data-reminder-minute="5"> 5 min</label>
                   <label><input id="reminder-two" type="checkbox" data-reminder-minute="2"> 2 min</label>
                 </div>
-                <button class="button secondary compact" id="enable-notifications" type="button">Enable notifications</button>
+                <button class="button secondary compact" id="enable-notifications" type="button" data-icon="bell">Enable notifications</button>
                 <p class="status-line" id="notification-status">Notifications work best after adding this app to your Home Screen.</p>
               </section>
               <form class="search-box" id="location-search-form">
@@ -175,7 +175,7 @@
                   Search address or building
                   <span class="search-row">
                     <input id="location-search" type="search" placeholder="e.g. EGHQ, TECOM, Park Zabeel View" autocomplete="off">
-                    <button class="button primary compact" type="submit">Search</button>
+                    <button class="button primary compact" type="submit" data-icon="search">Search</button>
                   </span>
                 </label>
                 <div class="search-results" id="search-results"></div>
@@ -186,14 +186,14 @@
                 <div class="map-hint">Tap the map to move the pin</div>
               </div>
               <div class="map-controls">
-                <button class="button secondary compact" id="use-current-location" type="button">Use current GPS</button>
-                <button class="button secondary compact" id="open-map-link" type="button">Open in Maps</button>
+                <button class="button secondary compact" id="use-current-location" type="button" data-icon="crosshair">Use current GPS</button>
+                <button class="button secondary compact" id="open-map-link" type="button" data-icon="external-link">Open in Maps</button>
               </div>
               <div class="nudge-grid" aria-label="Fine tune location">
-                <button type="button" data-nudge="north">North</button>
-                <button type="button" data-nudge="west">West</button>
-                <button type="button" data-nudge="east">East</button>
-                <button type="button" data-nudge="south">South</button>
+                <button type="button" data-nudge="north" data-icon="arrow-up" data-icon-only="true" aria-label="Move pin north"></button>
+                <button type="button" data-nudge="west" data-icon="arrow-left" data-icon-only="true" aria-label="Move pin west"></button>
+                <button type="button" data-nudge="east" data-icon="arrow-right" data-icon-only="true" aria-label="Move pin east"></button>
+                <button type="button" data-nudge="south" data-icon="arrow-down" data-icon-only="true" aria-label="Move pin south"></button>
               </div>
               <div class="coordinate-grid">
                 <label>
@@ -206,8 +206,8 @@
                 </label>
               </div>
               <div class="form-actions">
-                <button class="button primary" id="save-location" type="button">Save stop location</button>
-                <button class="button secondary" id="clear-location" type="button">Clear</button>
+                <button class="button primary" id="save-location" type="button" data-icon="map-pin-check">Save stop location</button>
+                <button class="button secondary" id="clear-location" type="button" data-icon="trash">Clear</button>
               </div>
               <p class="status-line" id="settings-status">Choose a stop to edit its location.</p>
             </article>
@@ -216,15 +216,15 @@
       </main>
 
       <nav class="bottom-nav" aria-label="App navigation">
-        <a href="#/home" data-nav="home">Home</a>
-        <a href="#/routes" data-nav="routes">Routes</a>
-        <a href="#/upload" data-nav="upload">Upload</a>
-        <a href="#/schedule" data-nav="schedule">Schedule</a>
-        <a href="#/settings" data-nav="settings">Settings</a>
+        <a href="#/home" data-nav="home" data-icon="home">Home</a>
+        <a href="#/routes" data-nav="routes" data-icon="route">Routes</a>
+        <a href="#/upload" data-nav="upload" data-icon="upload">Upload</a>
+        <a href="#/schedule" data-nav="schedule" data-icon="schedule">Schedule</a>
+        <a href="#/settings" data-nav="settings" data-icon="settings">Settings</a>
       </nav>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script type="module" src="script.js?v=alerts-home-schedule-upgrade-20260502"></script>
+    <script type="module" src="script.js?v=local-icons-upgrade-20260502"></script>
   </body>
 </html>

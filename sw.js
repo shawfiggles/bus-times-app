@@ -1,9 +1,9 @@
-const CACHE_NAME = "bus-times-v10";
+const CACHE_NAME = "bus-times-v11";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./script.js?v=alerts-home-schedule-upgrade-20260502",
+  "./script.js?v=local-icons-upgrade-20260502",
   "./manifest.webmanifest"
 ];
 
