@@ -10,10 +10,11 @@ const LAST_ROUTE_KEY = "busTimes.lastRouteId";
 const PARSER_VERSION = "2.0.0";
 const TIME_RE = /\b(?:[01]\d|2[0-3]):[0-5]\d\b/g;
 const DEFAULT_MAP_CENTER = { lat: 25.235612, lng: 55.297857 };
+const REMINDER_MINUTES = [30, 20, 10, 5, 2];
 const DEFAULT_COMMUTE_PREFS = {
   walkingSpeed: 75,
   bufferMinutes: 3,
-  reminders: { five: true, leave: true, one: false }
+  reminderMinutes: [10, 5, 2]
 };
 const PLACE_ALIASES = [
   {
@@ -44,7 +45,9 @@ const state = {
   editingStopIndex: 0,
   editingRouteId: null,
   pickerPosition: { ...DEFAULT_MAP_CENTER },
-  currentPosition: null
+  currentPosition: null,
+  homeRenderKey: "",
+  countdownText: ""
 };
 
 const els = {
@@ -55,6 +58,7 @@ const els = {
   distanceReadout: document.querySelector("#distance-readout"),
   nextTime: document.querySelector("#next-time"),
   countdown: document.querySelector("#countdown"),
+  countdownProgressFill: document.querySelector("#countdown-progress-fill"),
   commuteAdvice: document.querySelector("#commute-advice"),
   routeMap: document.querySelector("#route-map"),
   arrivalList: document.querySelector("#arrival-list"),
@@ -91,9 +95,11 @@ const els = {
   settingsStatus: document.querySelector("#settings-status"),
   walkingSpeed: document.querySelector("#walking-speed"),
   bufferMinutes: document.querySelector("#buffer-minutes"),
+  reminderThirty: document.querySelector("#reminder-thirty"),
+  reminderTwenty: document.querySelector("#reminder-twenty"),
+  reminderTen: document.querySelector("#reminder-ten"),
   reminderFive: document.querySelector("#reminder-five"),
-  reminderLeave: document.querySelector("#reminder-leave"),
-  reminderOne: document.querySelector("#reminder-one"),
+  reminderTwo: document.querySelector("#reminder-two"),
   enableNotifications: document.querySelector("#enable-notifications"),
   notificationStatus: document.querySelector("#notification-status")
 };
@@ -270,12 +276,14 @@ function formatDuration(minutes) {
   return remainder ? `in ${hours} hr ${remainder} min` : `in ${hours} hr`;
 }
 
-function formatCountdown(minutes) {
-  if (minutes <= 0) return "Now";
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
+function formatCountdown(seconds) {
+  if (seconds <= 0) return "Now";
+  const secondsTotal = Number(seconds);
+  const hours = Math.floor(secondsTotal / 3600);
+  const mins = Math.floor((secondsTotal % 3600) / 60);
+  const secs = secondsTotal % 60;
+  if (hours > 0) return `${hours}h ${mins}m ${String(secs).padStart(2, "0")}s`;
+  return `${mins}m ${String(secs).padStart(2, "0")}s`;
 }
 
 function formatDate(value) {
@@ -294,14 +302,20 @@ function lastItem(items) {
 
 function getTimedRows(route, stopIndex, now = new Date()) {
   if (!route?.rows?.length) return [];
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMs = now.getTime();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
 
   return route.rows
     .filter((row) => row[stopIndex])
     .map((row, index) => {
       const base = timeToMinutes(row[stopIndex]);
-      const minutes = base < currentMinutes ? base + 1440 : base;
-      return { row, index, minutes, wait: minutes - currentMinutes };
+      let targetAt = dayStart.getTime() + base * 60000;
+      if (targetAt < nowMs) targetAt += 1440 * 60000;
+      const minutes = Math.round((targetAt - dayStart.getTime()) / 60000);
+      const waitSeconds = Math.max(0, Math.ceil((targetAt - nowMs) / 1000));
+      const wait = Math.ceil(waitSeconds / 60);
+      return { row, index, minutes, wait, waitSeconds, targetAt };
     })
     .sort((a, b) => a.minutes - b.minutes);
 }
@@ -346,8 +360,26 @@ function commutePrefs(routeId = state.activeRouteId) {
   if (!routeId) return { ...DEFAULT_COMMUTE_PREFS };
   if (!state.settings.commutePrefsByRoute) state.settings.commutePrefsByRoute = {};
   if (!state.settings.commutePrefsByRoute[routeId]) state.settings.commutePrefsByRoute[routeId] = cloneJson(DEFAULT_COMMUTE_PREFS);
-  if (!state.settings.commutePrefsByRoute[routeId].reminders) state.settings.commutePrefsByRoute[routeId].reminders = cloneJson(DEFAULT_COMMUTE_PREFS.reminders);
-  return state.settings.commutePrefsByRoute[routeId];
+  const prefs = state.settings.commutePrefsByRoute[routeId];
+  if (!Array.isArray(prefs.reminderMinutes)) {
+    const old = prefs.reminders || {};
+    prefs.reminderMinutes = [
+      old.thirty && 30,
+      old.twenty && 20,
+      old.ten && 10,
+      (old.five || old.leave) && 5,
+      (old.two || old.one) && 2
+    ].filter(Boolean);
+    if (!prefs.reminderMinutes.length) prefs.reminderMinutes = cloneJson(DEFAULT_COMMUTE_PREFS.reminderMinutes);
+  }
+  if (!prefs.walkingSpeed) prefs.walkingSpeed = DEFAULT_COMMUTE_PREFS.walkingSpeed;
+  if (prefs.bufferMinutes === undefined) prefs.bufferMinutes = DEFAULT_COMMUTE_PREFS.bufferMinutes;
+  return prefs;
+}
+
+function activeReminderMinutes(routeId = state.activeRouteId) {
+  const prefs = commutePrefs(routeId);
+  return REMINDER_MINUTES.filter((minute) => prefs.reminderMinutes?.includes(minute));
 }
 
 function commuteGuidance(route, stopIndex, next) {
@@ -411,12 +443,16 @@ function renderShell() {
 function renderHome() {
   const route = activeRoute();
   if (!route) {
+    state.homeRenderKey = "";
+    state.countdownText = "";
+    document.body.dataset.homeState = "empty";
     els.homeRouteChip.textContent = "No route selected";
     els.homeUpdated.textContent = "Waiting for PDF";
     els.activeStopName.textContent = "--";
     els.distanceReadout.textContent = "Upload a route to begin";
     els.nextTime.textContent = "--:--";
     els.countdown.textContent = "Upload a route to begin";
+    els.countdownProgressFill.style.width = "0%";
     els.commuteAdvice.innerHTML = `<strong>No route yet.</strong><span>Upload a PDF to start.</span>`;
     els.routeMap.innerHTML = "";
     els.arrivalList.innerHTML = "";
@@ -435,24 +471,46 @@ function renderHome() {
   els.homeRouteChip.textContent = route.name;
   els.homeUpdated.textContent = route.effectiveDate || formatDate(route.updatedAt);
   els.activeStopName.textContent = activeStop?.shortName || activeStop?.name || "--";
+
+  if (!next) {
+    state.homeRenderKey = "";
+    state.countdownText = "";
+    document.body.dataset.homeState = "empty";
+    els.nextTime.textContent = "--:--";
+    els.countdown.textContent = "No times found for this stop";
+    els.countdownProgressFill.style.width = "0%";
+    els.commuteAdvice.innerHTML = `<strong>No departure found.</strong><span>Try another stop or update the PDF.</span>`;
+    els.routeMap.innerHTML = renderRouteMap(route);
+    els.arrivalList.innerHTML = "";
+    els.stopSwitcher.innerHTML = stops.map((stop) => `
+      <button class="${stop.index === state.activeStopIndex ? "active" : ""}" type="button" data-stop-index="${stop.index}">
+        ${escapeHTML(stop.shortName || stop.name)}
+      </button>
+    `).join("");
+    els.upcomingGrid.innerHTML = emptyState("No departures found.");
+    return;
+  }
+
+  els.nextTime.textContent = next.row[state.activeStopIndex];
+  document.body.dataset.homeState = next.waitSeconds <= 600 ? "soon" : "calm";
+  const countdownText = formatCountdown(next.waitSeconds);
+  if (state.countdownText !== countdownText) {
+    state.countdownText = countdownText;
+    els.countdown.textContent = countdownText;
+  }
+  const progress = Math.max(3, Math.min(100, 100 - (next.waitSeconds / 3600) * 100));
+  els.countdownProgressFill.style.width = `${progress}%`;
+
+  const staticKey = `${route.id}|${state.activeStopIndex}|${next.index}|${next.targetAt}|${next.wait}|${state.currentPosition ? "gps" : "nogps"}`;
+  if (state.homeRenderKey === staticKey) return;
+  state.homeRenderKey = staticKey;
+
   els.stopSwitcher.innerHTML = stops.map((stop) => `
     <button class="${stop.index === state.activeStopIndex ? "active" : ""}" type="button" data-stop-index="${stop.index}">
       ${escapeHTML(stop.shortName || stop.name)}
     </button>
   `).join("");
 
-  if (!next) {
-    els.nextTime.textContent = "--:--";
-    els.countdown.textContent = "No times found for this stop";
-    els.commuteAdvice.innerHTML = `<strong>No departure found.</strong><span>Try another stop or update the PDF.</span>`;
-    els.routeMap.innerHTML = renderRouteMap(route);
-    els.arrivalList.innerHTML = "";
-    els.upcomingGrid.innerHTML = emptyState("No departures found.");
-    return;
-  }
-
-  els.nextTime.textContent = next.row[state.activeStopIndex];
-  els.countdown.textContent = formatCountdown(next.wait);
   const guidance = commuteGuidance(route, state.activeStopIndex, next);
   els.commuteAdvice.dataset.state = guidance.state;
   els.commuteAdvice.innerHTML = `<strong>${escapeHTML(guidance.state)}: ${escapeHTML(guidance.title)}</strong><span>${escapeHTML(guidance.detail)}</span>`;
@@ -482,8 +540,12 @@ function renderRouteMap(route) {
   if (!route) return "";
   const bucket = locationBucket(route.id);
   const stops = route.stops;
+  const pulseLeft = route.stops.length > 1
+    ? Math.min(100, Math.max(0, (state.activeStopIndex / (route.stops.length - 1)) * 100))
+    : 0;
   return `
     <div class="route-line" style="--stops:${stops.length}">
+      <b class="route-pulse" style="--pulse-left:${pulseLeft}%"></b>
       ${stops.map((stop) => {
         const hasLocation = Boolean(bucket[stop.id]);
         const active = stop.index === state.activeStopIndex;
@@ -635,9 +697,16 @@ function renderCommutePrefs(route) {
   const prefs = commutePrefs(route?.id);
   els.walkingSpeed.value = prefs.walkingSpeed;
   els.bufferMinutes.value = prefs.bufferMinutes;
-  els.reminderFive.checked = Boolean(prefs.reminders?.five);
-  els.reminderLeave.checked = Boolean(prefs.reminders?.leave);
-  els.reminderOne.checked = Boolean(prefs.reminders?.one);
+  const selected = new Set(prefs.reminderMinutes || DEFAULT_COMMUTE_PREFS.reminderMinutes);
+  [
+    els.reminderThirty,
+    els.reminderTwenty,
+    els.reminderTen,
+    els.reminderFive,
+    els.reminderTwo
+  ].forEach((input) => {
+    input.checked = selected.has(Number(input.dataset.reminderMinute));
+  });
   const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
   if (!state.settings.notificationPrefs) state.settings.notificationPrefs = {};
   state.settings.notificationPrefs.permission = permission;
@@ -654,11 +723,13 @@ async function saveCommutePrefs() {
   const prefs = commutePrefs(route.id);
   prefs.walkingSpeed = Math.max(30, Math.min(140, Number(els.walkingSpeed.value) || DEFAULT_COMMUTE_PREFS.walkingSpeed));
   prefs.bufferMinutes = Math.max(0, Math.min(20, Number(els.bufferMinutes.value) || 0));
-  prefs.reminders = {
-    five: els.reminderFive.checked,
-    leave: els.reminderLeave.checked,
-    one: els.reminderOne.checked
-  };
+  prefs.reminderMinutes = [
+    els.reminderThirty,
+    els.reminderTwenty,
+    els.reminderTen,
+    els.reminderFive,
+    els.reminderTwo
+  ].filter((input) => input.checked).map((input) => Number(input.dataset.reminderMinute));
   await saveSettings();
   renderHome();
 }
@@ -1357,6 +1428,22 @@ function maybeInAppAlert() {
   const route = activeRoute();
   const next = route ? getTimedRows(route, state.activeStopIndex)[0] : null;
   if (!route || !next) return;
+
+  activeReminderMinutes(route.id).forEach((minute) => {
+    const targetSeconds = minute * 60;
+    if (next.waitSeconds > targetSeconds || next.waitSeconds < targetSeconds - 5) return;
+    const reminderKey = `${route.id}-${state.activeStopIndex}-${next.index}-${next.targetAt}-${minute}`;
+    if (state.lastReminderKey === reminderKey) return;
+    state.lastReminderKey = reminderKey;
+    if (navigator.vibrate) navigator.vibrate([90, 60, 90]);
+    const body = `${route.name} from ${route.stops[state.activeStopIndex]?.shortName || route.stops[state.activeStopIndex]?.name || "your stop"} departs at ${next.row[state.activeStopIndex]}.`;
+    if (state.settings.notificationPrefs?.enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification(`${minute} min until your bus`, { body });
+    } else {
+      showInAppAlert(`${minute} min until your bus`, body);
+    }
+  });
+
   const guidance = commuteGuidance(route, state.activeStopIndex, next);
   if (!["Leave now", "You may miss this"].includes(guidance.state)) return;
   if (state.lastAlertKey === `${route.id}-${next.index}-${guidance.state}`) return;
@@ -1364,7 +1451,19 @@ function maybeInAppAlert() {
   if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
   if (state.settings.notificationPrefs?.enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
     new Notification("Bus Times", { body: `${guidance.state}: ${guidance.title}` });
+  } else {
+    showInAppAlert(guidance.state, guidance.title);
   }
+}
+
+function showInAppAlert(title, body) {
+  const existing = document.querySelector(".toast-alert");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "toast-alert";
+  toast.innerHTML = `<strong>${escapeHTML(title)}</strong><span>${escapeHTML(body)}</span>`;
+  document.body.append(toast);
+  window.setTimeout(() => toast.remove(), 8000);
 }
 
 function nudgePicker(direction) {
@@ -1461,14 +1560,22 @@ function wireEvents() {
   els.lngInput.addEventListener("change", updatePickerFromInputs);
   els.saveLocation.addEventListener("click", saveStopLocation);
   els.clearLocation.addEventListener("click", clearStopLocation);
-  [els.walkingSpeed, els.bufferMinutes, els.reminderFive, els.reminderLeave, els.reminderOne].forEach((input) => {
+  [
+    els.walkingSpeed,
+    els.bufferMinutes,
+    els.reminderThirty,
+    els.reminderTwenty,
+    els.reminderTen,
+    els.reminderFive,
+    els.reminderTwo
+  ].forEach((input) => {
     input.addEventListener("change", saveCommutePrefs);
   });
   els.enableNotifications.addEventListener("click", enableNotifications);
   window.setInterval(() => {
     renderHome();
     maybeInAppAlert();
-  }, 30000);
+  }, 1000);
 }
 
 function initStarfield() {
