@@ -10,11 +10,10 @@ const LAST_ROUTE_KEY = "busTimes.lastRouteId";
 const PARSER_VERSION = "2.0.0";
 const TIME_RE = /\b(?:[01]\d|2[0-3]):[0-5]\d\b/g;
 const DEFAULT_MAP_CENTER = { lat: 25.235612, lng: 55.297857 };
-const REMINDER_MINUTES = [30, 20, 10, 5, 2];
 const DEFAULT_COMMUTE_PREFS = {
   walkingSpeed: 75,
   bufferMinutes: 3,
-  reminderMinutes: [10, 5, 2]
+  reminders: { five: true, leave: true, one: false }
 };
 const PLACE_ALIASES = [
   {
@@ -45,11 +44,7 @@ const state = {
   editingStopIndex: 0,
   editingRouteId: null,
   pickerPosition: { ...DEFAULT_MAP_CENTER },
-  currentPosition: null,
-  alertTimers: new Map(),
-  homeRenderKey: "",
-  countdownMain: "",
-  countdownSeconds: ""
+  currentPosition: null
 };
 
 const els = {
@@ -60,8 +55,6 @@ const els = {
   distanceReadout: document.querySelector("#distance-readout"),
   nextTime: document.querySelector("#next-time"),
   countdown: document.querySelector("#countdown"),
-  countdownProgressFill: document.querySelector("#countdown-progress-fill"),
-  departureRingFill: document.querySelector("#departure-ring-fill"),
   commuteAdvice: document.querySelector("#commute-advice"),
   routeMap: document.querySelector("#route-map"),
   arrivalList: document.querySelector("#arrival-list"),
@@ -96,11 +89,11 @@ const els = {
   saveLocation: document.querySelector("#save-location"),
   clearLocation: document.querySelector("#clear-location"),
   settingsStatus: document.querySelector("#settings-status"),
-  reminderThirty: document.querySelector("#reminder-thirty"),
-  reminderTwenty: document.querySelector("#reminder-twenty"),
-  reminderTen: document.querySelector("#reminder-ten"),
+  walkingSpeed: document.querySelector("#walking-speed"),
+  bufferMinutes: document.querySelector("#buffer-minutes"),
   reminderFive: document.querySelector("#reminder-five"),
-  reminderTwo: document.querySelector("#reminder-two"),
+  reminderLeave: document.querySelector("#reminder-leave"),
+  reminderOne: document.querySelector("#reminder-one"),
   enableNotifications: document.querySelector("#enable-notifications"),
   notificationStatus: document.querySelector("#notification-status")
 };
@@ -166,7 +159,6 @@ async function loadState() {
     stopLocationsByRoute: {},
     lastStopByRoute: {},
     commutePrefsByRoute: {},
-    departureAlertsByRoute: {},
     notificationPrefs: { enabled: false, permission: "default" },
     ...(settingsRecord?.value || {})
   };
@@ -278,57 +270,12 @@ function formatDuration(minutes) {
   return remainder ? `in ${hours} hr ${remainder} min` : `in ${hours} hr`;
 }
 
-function formatCountdown(seconds) {
-  if (seconds <= 0) return "Now";
-  const secondsTotal = Number(seconds);
-  const hours = Math.floor(secondsTotal / 3600);
-  const mins = Math.floor((secondsTotal % 3600) / 60);
-  const secs = secondsTotal % 60;
-  if (hours > 0) return `${hours}h ${mins}m ${String(secs).padStart(2, "0")}s`;
-  return `${mins}m ${String(secs).padStart(2, "0")}s`;
-}
-
-function countdownParts(seconds) {
-  if (seconds <= 0) {
-    return { main: "Now", seconds: "" };
-  }
-  const secondsTotal = Number(seconds);
-  const hours = Math.floor(secondsTotal / 3600);
-  const mins = Math.floor((secondsTotal % 3600) / 60);
-  const secs = secondsTotal % 60;
-  return {
-    main: hours > 0 ? `${hours}h ${mins}m` : `${mins}m`,
-    seconds: `${String(secs).padStart(2, "0")}s`
-  };
-}
-
-function renderCountdown(seconds) {
-  const parts = countdownParts(seconds);
-  if (state.countdownMain !== parts.main) {
-    state.countdownMain = parts.main;
-    els.countdown.innerHTML = `
-      <span class="time-main">${escapeHTML(parts.main)}</span>
-      <span class="time-seconds">${escapeHTML(parts.seconds)}</span>
-    `;
-    state.countdownSeconds = parts.seconds;
-    return;
-  }
-
-  const secondsEl = els.countdown.querySelector(".time-seconds");
-  if (secondsEl && state.countdownSeconds !== parts.seconds) {
-    state.countdownSeconds = parts.seconds;
-    secondsEl.textContent = parts.seconds;
-    secondsEl.classList.remove("tick");
-    void secondsEl.offsetWidth;
-    secondsEl.classList.add("tick");
-  }
-}
-
-function urgencyFor(seconds) {
-  if (seconds <= 120) return "critical";
-  if (seconds <= 600) return "soon";
-  if (seconds <= 1800) return "warm";
-  return "calm";
+function formatCountdown(minutes) {
+  if (minutes <= 0) return "Now";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
 }
 
 function formatDate(value) {
@@ -347,20 +294,14 @@ function lastItem(items) {
 
 function getTimedRows(route, stopIndex, now = new Date()) {
   if (!route?.rows?.length) return [];
-  const nowMs = now.getTime();
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   return route.rows
     .filter((row) => row[stopIndex])
     .map((row, index) => {
       const base = timeToMinutes(row[stopIndex]);
-      let targetAt = dayStart.getTime() + base * 60000;
-      if (targetAt < nowMs) targetAt += 1440 * 60000;
-      const minutes = Math.round((targetAt - dayStart.getTime()) / 60000);
-      const waitSeconds = Math.max(0, Math.ceil((targetAt - nowMs) / 1000));
-      const wait = Math.ceil(waitSeconds / 60);
-      return { row, index, minutes, wait, waitSeconds, targetAt };
+      const minutes = base < currentMinutes ? base + 1440 : base;
+      return { row, index, minutes, wait: minutes - currentMinutes };
     })
     .sort((a, b) => a.minutes - b.minutes);
 }
@@ -405,37 +346,8 @@ function commutePrefs(routeId = state.activeRouteId) {
   if (!routeId) return { ...DEFAULT_COMMUTE_PREFS };
   if (!state.settings.commutePrefsByRoute) state.settings.commutePrefsByRoute = {};
   if (!state.settings.commutePrefsByRoute[routeId]) state.settings.commutePrefsByRoute[routeId] = cloneJson(DEFAULT_COMMUTE_PREFS);
-  const prefs = state.settings.commutePrefsByRoute[routeId];
-  if (!Array.isArray(prefs.reminderMinutes)) {
-    const old = prefs.reminders || {};
-    prefs.reminderMinutes = [
-      old.thirty && 30,
-      old.twenty && 20,
-      old.ten && 10,
-      (old.five || old.leave) && 5,
-      (old.two || old.one) && 2
-    ].filter(Boolean);
-    if (!prefs.reminderMinutes.length) prefs.reminderMinutes = cloneJson(DEFAULT_COMMUTE_PREFS.reminderMinutes);
-  }
-  if (!prefs.walkingSpeed) prefs.walkingSpeed = DEFAULT_COMMUTE_PREFS.walkingSpeed;
-  if (prefs.bufferMinutes === undefined) prefs.bufferMinutes = DEFAULT_COMMUTE_PREFS.bufferMinutes;
-  return prefs;
-}
-
-function alertBucket(routeId = state.activeRouteId) {
-  if (!routeId) return {};
-  if (!state.settings.departureAlertsByRoute) state.settings.departureAlertsByRoute = {};
-  if (!state.settings.departureAlertsByRoute[routeId]) state.settings.departureAlertsByRoute[routeId] = {};
-  return state.settings.departureAlertsByRoute[routeId];
-}
-
-function alertKey(routeId, stopIndex, timed) {
-  return `${routeId}|${stopIndex}|${timed.index}|${timed.targetAt}`;
-}
-
-function activeReminderMinutes(routeId = state.activeRouteId) {
-  const prefs = commutePrefs(routeId);
-  return REMINDER_MINUTES.filter((minute) => prefs.reminderMinutes?.includes(minute));
+  if (!state.settings.commutePrefsByRoute[routeId].reminders) state.settings.commutePrefsByRoute[routeId].reminders = cloneJson(DEFAULT_COMMUTE_PREFS.reminders);
+  return state.settings.commutePrefsByRoute[routeId];
 }
 
 function commuteGuidance(route, stopIndex, next) {
@@ -499,18 +411,12 @@ function renderShell() {
 function renderHome() {
   const route = activeRoute();
   if (!route) {
-    state.homeRenderKey = "";
-    state.countdownMain = "";
-    state.countdownSeconds = "";
-    document.body.dataset.urgency = "calm";
     els.homeRouteChip.textContent = "No route selected";
     els.homeUpdated.textContent = "Waiting for PDF";
     els.activeStopName.textContent = "--";
     els.distanceReadout.textContent = "Upload a route to begin";
     els.nextTime.textContent = "--:--";
     els.countdown.textContent = "Upload a route to begin";
-    els.countdownProgressFill.style.width = "0%";
-    els.departureRingFill.style.strokeDashoffset = "327";
     els.commuteAdvice.innerHTML = `<strong>No route yet.</strong><span>Upload a PDF to start.</span>`;
     els.routeMap.innerHTML = "";
     els.arrivalList.innerHTML = "";
@@ -536,14 +442,8 @@ function renderHome() {
   `).join("");
 
   if (!next) {
-    state.homeRenderKey = "";
-    state.countdownMain = "";
-    state.countdownSeconds = "";
-    document.body.dataset.urgency = "calm";
     els.nextTime.textContent = "--:--";
     els.countdown.textContent = "No times found for this stop";
-    els.countdownProgressFill.style.width = "0%";
-    els.departureRingFill.style.strokeDashoffset = "327";
     els.commuteAdvice.innerHTML = `<strong>No departure found.</strong><span>Try another stop or update the PDF.</span>`;
     els.routeMap.innerHTML = renderRouteMap(route);
     els.arrivalList.innerHTML = "";
@@ -552,18 +452,7 @@ function renderHome() {
   }
 
   els.nextTime.textContent = next.row[state.activeStopIndex];
-  const urgency = urgencyFor(next.waitSeconds);
-  document.body.dataset.urgency = urgency;
-  renderCountdown(next.waitSeconds);
-  const progress = Math.max(4, Math.min(100, 100 - (next.waitSeconds / 3600) * 100));
-  els.countdownProgressFill.style.width = `${progress}%`;
-  els.departureRingFill.style.strokeDashoffset = String(327 - (progress / 100) * 327);
-
-  const alertSignature = Object.keys(alertBucket(route.id)).sort().join(",");
-  const homeRenderKey = `${route.id}|${state.activeStopIndex}|${next.index}|${next.targetAt}|${next.wait}|${alertSignature}|${state.currentPosition ? "gps" : "nogps"}`;
-  if (state.homeRenderKey === homeRenderKey) return;
-  state.homeRenderKey = homeRenderKey;
-
+  els.countdown.textContent = formatCountdown(next.wait);
   const guidance = commuteGuidance(route, state.activeStopIndex, next);
   els.commuteAdvice.dataset.state = guidance.state;
   els.commuteAdvice.innerHTML = `<strong>${escapeHTML(guidance.state)}: ${escapeHTML(guidance.title)}</strong><span>${escapeHTML(guidance.detail)}</span>`;
@@ -573,28 +462,19 @@ function renderHome() {
     .map((stop) => {
       const arrival = next.row[stop.index];
       const rideMinutes = normalizeArrival(next.row, stop.index, next.minutes) - next.minutes;
-      return `<div style="--i:${stop.index - state.activeStopIndex}"><span>${escapeHTML(stop.name)}</span><strong>${arrival}</strong><small>${rideMinutes} min ride</small></div>`;
+      return `<div><span>${escapeHTML(stop.name)}</span><strong>${arrival}</strong><small>${rideMinutes} min ride</small></div>`;
     })
     .join("") || `<div><span>End of route</span><strong>${next.row[state.activeStopIndex]}</strong><small>No downstream stops</small></div>`;
 
   els.upcomingGrid.innerHTML = getTimedRows(route, state.activeStopIndex)
     .slice(0, 5)
-    .map((timed) => {
-      const { row, wait } = timed;
-      const key = alertKey(route.id, state.activeStopIndex, timed);
-      const armed = Boolean(alertBucket(route.id)[key]);
-      return `
-      <article class="${armed ? "armed" : ""}" style="--i:${timed.index % 5}">
+    .map(({ row, wait }) => `
+      <article>
         <span>${escapeHTML(activeStop?.shortName || activeStop?.name || "Stop")}</span>
         <strong>${row[state.activeStopIndex]}</strong>
-        <div class="departure-row">
-          <small>${formatDuration(wait)}</small>
-          <button class="alarm-button ${armed ? "active" : ""}" type="button" data-alert-key="${escapeHTML(key)}" aria-label="${armed ? "Remove" : "Set"} reminder for ${row[state.activeStopIndex]}">
-            ${armed ? "Alarm set" : "Alarm"}
-          </button>
-        </div>
+        <small>${formatDuration(wait)}</small>
       </article>
-    `; })
+    `)
     .join("");
 }
 
@@ -602,12 +482,8 @@ function renderRouteMap(route) {
   if (!route) return "";
   const bucket = locationBucket(route.id);
   const stops = route.stops;
-  const pulseLeft = route.stops.length > 1
-    ? Math.min(100, Math.max(0, (state.activeStopIndex / (route.stops.length - 1)) * 100))
-    : 0;
   return `
     <div class="route-line" style="--stops:${stops.length}">
-      <b class="bus-pulse" style="--pulse-left:${pulseLeft}%"></b>
       ${stops.map((stop) => {
         const hasLocation = Boolean(bucket[stop.id]);
         const active = stop.index === state.activeStopIndex;
@@ -702,10 +578,7 @@ function renderSchedule() {
     <th>${index === 0 ? "Depart " : ""}${escapeHTML(stop.shortName || stop.name)}</th>
   `).join("")}</tr>`;
   els.scheduleBody.innerHTML = route.rows.map((row) => `
-    <tr>${row.map((time, index) => {
-      const label = `${index === 0 ? "Depart " : ""}${route.stops[index]?.shortName || route.stops[index]?.name || `Stop ${index + 1}`}`;
-      return `<td data-label="${escapeHTML(label)}">${time}</td>`;
-    }).join("")}</tr>
+    <tr>${row.map((time) => `<td>${time}</td>`).join("")}</tr>
   `).join("");
 }
 
@@ -760,42 +633,33 @@ function renderSettings() {
 
 function renderCommutePrefs(route) {
   const prefs = commutePrefs(route?.id);
-  const selected = new Set(prefs.reminderMinutes || DEFAULT_COMMUTE_PREFS.reminderMinutes);
-  [
-    els.reminderThirty,
-    els.reminderTwenty,
-    els.reminderTen,
-    els.reminderFive,
-    els.reminderTwo
-  ].forEach((input) => {
-    input.checked = selected.has(Number(input.dataset.reminderMinute));
-  });
+  els.walkingSpeed.value = prefs.walkingSpeed;
+  els.bufferMinutes.value = prefs.bufferMinutes;
+  els.reminderFive.checked = Boolean(prefs.reminders?.five);
+  els.reminderLeave.checked = Boolean(prefs.reminders?.leave);
+  els.reminderOne.checked = Boolean(prefs.reminders?.one);
   const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
   if (!state.settings.notificationPrefs) state.settings.notificationPrefs = {};
   state.settings.notificationPrefs.permission = permission;
-  const activeAlerts = Object.keys(alertBucket(route?.id)).length;
   els.notificationStatus.textContent = permission === "granted"
-    ? `${activeAlerts} bus alarm${activeAlerts === 1 ? "" : "s"} armed. Notifications are enabled.`
+    ? "Notifications are enabled for this browser."
     : permission === "denied"
       ? "Notifications are blocked. In-app alerts will still work while open."
-      : "Choose bus alarms on Home, then enable notifications here when supported.";
+      : "Install to Home Screen on iPhone, then enable notifications when supported.";
 }
 
 async function saveCommutePrefs() {
   const route = activeRoute();
   if (!route) return;
   const prefs = commutePrefs(route.id);
-  prefs.reminderMinutes = [
-    els.reminderThirty,
-    els.reminderTwenty,
-    els.reminderTen,
-    els.reminderFive,
-    els.reminderTwo
-  ]
-    .filter((input) => input.checked)
-    .map((input) => Number(input.dataset.reminderMinute));
+  prefs.walkingSpeed = Math.max(30, Math.min(140, Number(els.walkingSpeed.value) || DEFAULT_COMMUTE_PREFS.walkingSpeed));
+  prefs.bufferMinutes = Math.max(0, Math.min(20, Number(els.bufferMinutes.value) || 0));
+  prefs.reminders = {
+    five: els.reminderFive.checked,
+    leave: els.reminderLeave.checked,
+    one: els.reminderOne.checked
+  };
   await saveSettings();
-  scheduleDepartureAlerts();
   renderHome();
 }
 
@@ -1474,92 +1338,6 @@ function openExternalMap() {
   }
 }
 
-async function toggleDepartureAlert(key) {
-  const route = activeRoute();
-  if (!route) return;
-  const timed = getTimedRows(route, state.activeStopIndex).find((item) => alertKey(route.id, state.activeStopIndex, item) === key);
-  if (!timed) return;
-  const bucket = alertBucket(route.id);
-  if (bucket[key]) {
-    delete bucket[key];
-    els.notificationStatus.textContent = "Bus alarm removed.";
-  } else {
-    const stop = route.stops[state.activeStopIndex];
-    bucket[key] = {
-      key,
-      routeId: route.id,
-      routeName: route.name,
-      stopIndex: state.activeStopIndex,
-      stopName: stop?.name || "Stop",
-      rowIndex: timed.index,
-      departTime: timed.row[state.activeStopIndex],
-      targetAt: timed.targetAt,
-      createdAt: new Date().toISOString()
-    };
-    els.notificationStatus.textContent = `Alarm set for ${bucket[key].departTime}.`;
-    showInAppAlert("Alarm armed", `${route.name} from ${bucket[key].stopName} at ${bucket[key].departTime}.`);
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      els.notificationStatus.textContent = `Alarm set for ${bucket[key].departTime}. Enable notifications in Settings for phone alerts.`;
-    }
-  }
-  await saveSettings();
-  scheduleDepartureAlerts();
-  renderAll();
-}
-
-function pruneExpiredAlerts() {
-  const now = Date.now();
-  let changed = false;
-  Object.entries(state.settings.departureAlertsByRoute || {}).forEach(([routeId, bucket]) => {
-    Object.entries(bucket).forEach(([key, alert]) => {
-      if (Number(alert.targetAt) < now - 60000) {
-        delete state.settings.departureAlertsByRoute[routeId][key];
-        changed = true;
-      }
-    });
-  });
-  if (changed) saveSettings();
-}
-
-function scheduleDepartureAlerts() {
-  state.alertTimers.forEach((timer) => clearTimeout(timer));
-  state.alertTimers.clear();
-  pruneExpiredAlerts();
-  const now = Date.now();
-  Object.values(state.settings.departureAlertsByRoute || {}).forEach((bucket) => {
-    Object.values(bucket).forEach((alert) => {
-      activeReminderMinutes(alert.routeId).forEach((minute) => {
-        const notifyAt = Number(alert.targetAt) - minute * 60000;
-        const delay = notifyAt - now;
-        const key = `${alert.key}|${minute}`;
-        if (delay < -60000 || delay > 2147483647) return;
-        const timer = window.setTimeout(() => fireDepartureAlert(alert, minute), Math.max(0, delay));
-        state.alertTimers.set(key, timer);
-      });
-    });
-  });
-}
-
-function fireDepartureAlert(alert, minute) {
-  const body = `${alert.routeName} from ${alert.stopName} departs at ${alert.departTime}.`;
-  if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
-  if (state.settings.notificationPrefs?.enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
-    new Notification(`${minute} min until your bus`, { body });
-  } else {
-    showInAppAlert(`${minute} min until your bus`, body);
-  }
-}
-
-function showInAppAlert(title, body) {
-  const existing = document.querySelector(".toast-alert");
-  if (existing) existing.remove();
-  const toast = document.createElement("div");
-  toast.className = "toast-alert";
-  toast.innerHTML = `<strong>${escapeHTML(title)}</strong><span>${escapeHTML(body)}</span>`;
-  document.body.append(toast);
-  window.setTimeout(() => toast.remove(), 9000);
-}
-
 async function enableNotifications() {
   if (typeof Notification === "undefined") {
     els.notificationStatus.textContent = "This browser does not support notifications here. In-app alerts still work.";
@@ -1570,15 +1348,23 @@ async function enableNotifications() {
   state.settings.notificationPrefs.enabled = permission === "granted";
   state.settings.notificationPrefs.permission = permission;
   await saveSettings();
-  scheduleDepartureAlerts();
   els.notificationStatus.textContent = permission === "granted"
     ? "Notifications enabled. Keep the app installed/open for best reliability."
     : "Notifications not enabled. In-app alerts still work while open.";
-  renderHome();
 }
 
 function maybeInAppAlert() {
-  pruneExpiredAlerts();
+  const route = activeRoute();
+  const next = route ? getTimedRows(route, state.activeStopIndex)[0] : null;
+  if (!route || !next) return;
+  const guidance = commuteGuidance(route, state.activeStopIndex, next);
+  if (!["Leave now", "You may miss this"].includes(guidance.state)) return;
+  if (state.lastAlertKey === `${route.id}-${next.index}-${guidance.state}`) return;
+  state.lastAlertKey = `${route.id}-${next.index}-${guidance.state}`;
+  if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
+  if (state.settings.notificationPrefs?.enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
+    new Notification("Bus Times", { body: `${guidance.state}: ${guidance.title}` });
+  }
 }
 
 function nudgePicker(direction) {
@@ -1616,10 +1402,6 @@ function wireEvents() {
     els.distanceReadout.textContent = "Selected manually";
     rememberStop(state.activeRouteId, state.activeStopIndex);
     renderAll();
-  });
-  els.upcomingGrid.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-alert-key]");
-    if (button) toggleDepartureAlert(button.dataset.alertKey);
   });
   els.routeList.addEventListener("click", async (event) => {
     const select = event.target.closest("[data-select-route]");
@@ -1679,14 +1461,14 @@ function wireEvents() {
   els.lngInput.addEventListener("change", updatePickerFromInputs);
   els.saveLocation.addEventListener("click", saveStopLocation);
   els.clearLocation.addEventListener("click", clearStopLocation);
-  [els.reminderThirty, els.reminderTwenty, els.reminderTen, els.reminderFive, els.reminderTwo].forEach((input) => {
+  [els.walkingSpeed, els.bufferMinutes, els.reminderFive, els.reminderLeave, els.reminderOne].forEach((input) => {
     input.addEventListener("change", saveCommutePrefs);
   });
   els.enableNotifications.addEventListener("click", enableNotifications);
   window.setInterval(() => {
     renderHome();
     maybeInAppAlert();
-  }, 1000);
+  }, 30000);
 }
 
 function initStarfield() {
@@ -1768,7 +1550,6 @@ async function init() {
   initStarfield();
   await loadState();
   registerServiceWorker();
-  scheduleDepartureAlerts();
   if (!location.hash || location.hash === "#setup") location.hash = "#/home";
   handleRoute();
 }

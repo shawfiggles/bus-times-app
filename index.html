@@ -24,25 +24,20 @@
 
       <main class="views">
         <section class="view active" id="view-home" data-view="home" aria-labelledby="home-title">
-          <h1 class="sr-only" id="home-title">Next bus countdown</h1>
-          <div class="home-meta">
-            <span id="home-route-chip">No route selected</span>
-            <span id="home-updated">Waiting for PDF</span>
+          <div class="hero-copy">
+            <p class="eyebrow">Live commute</p>
+            <h1 id="home-title">Next bus countdown.</h1>
+            <p class="lede" id="home-lede">Your last route and stop open automatically, with the next departure front and center.</p>
           </div>
 
           <article class="next-card">
+            <div class="panel-topline">
+              <span id="home-route-chip">No route selected</span>
+              <span id="home-updated">Waiting for PDF</span>
+            </div>
             <div class="next-time">
               <span class="label">Next bus in</span>
-              <div class="countdown-stage">
-                <svg class="departure-ring" viewBox="0 0 120 120" aria-hidden="true">
-                  <circle class="ring-track" cx="60" cy="60" r="52"></circle>
-                  <circle class="ring-fill" id="departure-ring-fill" cx="60" cy="60" r="52"></circle>
-                </svg>
-                <strong id="countdown">--</strong>
-              </div>
-              <div class="countdown-progress" aria-hidden="true">
-                <span id="countdown-progress-fill"></span>
-              </div>
+              <strong id="countdown">--</strong>
               <small>Departs at <span id="next-time">--:--</span></small>
             </div>
             <div class="next-stop">
@@ -159,13 +154,20 @@
             <article class="map-card">
               <section class="prefs-panel" aria-labelledby="prefs-title">
                 <h2 id="prefs-title">Commute alerts</h2>
-                <p class="prefs-copy">Tap an alarm beside a bus on Home, then choose when this app should remind you.</p>
+                <div class="coordinate-grid">
+                  <label>
+                    Walking speed
+                    <input id="walking-speed" type="number" min="30" max="140" step="5" inputmode="numeric">
+                  </label>
+                  <label>
+                    Buffer minutes
+                    <input id="buffer-minutes" type="number" min="0" max="20" step="1" inputmode="numeric">
+                  </label>
+                </div>
                 <div class="reminder-grid">
-                  <label><input id="reminder-thirty" type="checkbox" data-reminder-minute="30"> 30 min</label>
-                  <label><input id="reminder-twenty" type="checkbox" data-reminder-minute="20"> 20 min</label>
-                  <label><input id="reminder-ten" type="checkbox" data-reminder-minute="10"> 10 min</label>
-                  <label><input id="reminder-five" type="checkbox" data-reminder-minute="5"> 5 min</label>
-                  <label><input id="reminder-two" type="checkbox" data-reminder-minute="2"> 2 min</label>
+                  <label><input id="reminder-five" type="checkbox"> 5 min before</label>
+                  <label><input id="reminder-leave" type="checkbox"> Leave-now</label>
+                  <label><input id="reminder-one" type="checkbox"> 1 min before</label>
                 </div>
                 <button class="button secondary compact" id="enable-notifications" type="button">Enable notifications</button>
                 <p class="status-line" id="notification-status">Notifications work best after adding this app to your Home Screen.</p>
@@ -225,6 +227,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script type="module" src="script.js?v=motion-cleanup-20260501"></script>
+    <script type="module" src="script.js?v=pdfjs3-compat-20260428"></script>
   </body>
 </html>
