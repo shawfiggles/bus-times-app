@@ -39,8 +39,18 @@
               </div>
               <small>Departs at <span id="next-time">--:--</span></small>
             </div>
+            <section class="upcoming-strip" aria-labelledby="upcoming-title">
+              <div class="section-heading compact-heading">
+                <div>
+                  <p class="eyebrow">Following</p>
+                  <h2 id="upcoming-title">Upcoming departures</h2>
+                </div>
+                <a href="#/schedule">Full schedule</a>
+              </div>
+              <div class="upcoming-grid" id="upcoming-grid"></div>
+            </section>
             <div class="next-stop">
-              <span class="label">Departure stop</span>
+              <span class="label">Boarding at</span>
               <strong id="active-stop-name">--</strong>
               <small id="distance-readout">Select or set stop locations</small>
             </div>
@@ -57,17 +67,6 @@
             <button class="button secondary" id="locate-button" type="button">Use nearest stop</button>
             <a class="button primary" href="#/upload">Upload route PDF</a>
           </div>
-
-          <section class="mini-section" aria-labelledby="upcoming-title">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Following</p>
-                <h2 id="upcoming-title">Upcoming departures</h2>
-              </div>
-              <a href="#/schedule">Full schedule</a>
-            </div>
-            <div class="upcoming-grid" id="upcoming-grid"></div>
-          </section>
         </section>
 
         <section class="view" id="view-routes" data-view="routes" aria-labelledby="routes-title">
@@ -90,7 +89,7 @@
             <input id="pdf-input" type="file" accept="application/pdf,.pdf">
             <div class="upload-icon" aria-hidden="true"></div>
             <strong>Choose route PDF</strong>
-            <span id="upload-status">Supports the Route 07 and Route 1 style PDFs, plus similar stop/time tables.</span>
+            <span id="upload-status">Choose a route PDF.</span>
           </article>
 
           <article class="review-card hidden" id="review-card" aria-labelledby="review-title">
@@ -164,8 +163,6 @@
                   </label>
                 </div>
                 <div class="reminder-grid">
-                  <label><input id="reminder-thirty" type="checkbox" data-reminder-minute="30"> 30 min</label>
-                  <label><input id="reminder-twenty" type="checkbox" data-reminder-minute="20"> 20 min</label>
                   <label><input id="reminder-ten" type="checkbox" data-reminder-minute="10"> 10 min</label>
                   <label><input id="reminder-five" type="checkbox" data-reminder-minute="5"> 5 min</label>
                   <label><input id="reminder-two" type="checkbox" data-reminder-minute="2"> 2 min</label>
@@ -228,6 +225,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script type="module" src="script.js?v=daily-driver-upgrade-20260502"></script>
+    <script type="module" src="script.js?v=alerts-home-schedule-upgrade-20260502"></script>
   </body>
 </html>

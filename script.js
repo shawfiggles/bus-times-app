@@ -10,7 +10,7 @@ const LAST_ROUTE_KEY = "busTimes.lastRouteId";
 const PARSER_VERSION = "2.0.0";
 const TIME_RE = /\b(?:[01]\d|2[0-3]):[0-5]\d\b/g;
 const DEFAULT_MAP_CENTER = { lat: 25.235612, lng: 55.297857 };
-const REMINDER_MINUTES = [30, 20, 10, 5, 2];
+const REMINDER_MINUTES = [10, 5, 2];
 const DEFAULT_COMMUTE_PREFS = {
   walkingSpeed: 75,
   bufferMinutes: 3,
@@ -47,7 +47,8 @@ const state = {
   pickerPosition: { ...DEFAULT_MAP_CENTER },
   currentPosition: null,
   homeRenderKey: "",
-  countdownText: ""
+  countdownText: "",
+  alertRevision: 0
 };
 
 const els = {
@@ -95,8 +96,6 @@ const els = {
   settingsStatus: document.querySelector("#settings-status"),
   walkingSpeed: document.querySelector("#walking-speed"),
   bufferMinutes: document.querySelector("#buffer-minutes"),
-  reminderThirty: document.querySelector("#reminder-thirty"),
-  reminderTwenty: document.querySelector("#reminder-twenty"),
   reminderTen: document.querySelector("#reminder-ten"),
   reminderFive: document.querySelector("#reminder-five"),
   reminderTwo: document.querySelector("#reminder-two"),
@@ -165,6 +164,7 @@ async function loadState() {
     stopLocationsByRoute: {},
     lastStopByRoute: {},
     commutePrefsByRoute: {},
+    selectedDepartureAlertsByRoute: {},
     notificationPrefs: { enabled: false, permission: "default" },
     ...(settingsRecord?.value || {})
   };
@@ -364,8 +364,6 @@ function commutePrefs(routeId = state.activeRouteId) {
   if (!Array.isArray(prefs.reminderMinutes)) {
     const old = prefs.reminders || {};
     prefs.reminderMinutes = [
-      old.thirty && 30,
-      old.twenty && 20,
       old.ten && 10,
       (old.five || old.leave) && 5,
       (old.two || old.one) && 2
@@ -380,6 +378,50 @@ function commutePrefs(routeId = state.activeRouteId) {
 function activeReminderMinutes(routeId = state.activeRouteId) {
   const prefs = commutePrefs(routeId);
   return REMINDER_MINUTES.filter((minute) => prefs.reminderMinutes?.includes(minute));
+}
+
+function selectedAlertBucket(routeId = state.activeRouteId) {
+  if (!routeId) return {};
+  if (!state.settings.selectedDepartureAlertsByRoute) state.settings.selectedDepartureAlertsByRoute = {};
+  if (!state.settings.selectedDepartureAlertsByRoute[routeId]) state.settings.selectedDepartureAlertsByRoute[routeId] = {};
+  return state.settings.selectedDepartureAlertsByRoute[routeId];
+}
+
+function departureAlertKey(routeId, stopIndex, timed) {
+  return `${routeId}|${stopIndex}|${timed.index}|${timed.targetAt}`;
+}
+
+function makeDepartureAlert(route, stopIndex, timed) {
+  const stop = route.stops[stopIndex];
+  return {
+    key: departureAlertKey(route.id, stopIndex, timed),
+    routeId: route.id,
+    routeName: route.name,
+    stopIndex,
+    stopName: stop?.shortName || stop?.name || "Stop",
+    rowIndex: timed.index,
+    targetAt: timed.targetAt,
+    departTime: timed.row[stopIndex],
+    firedMinutes: []
+  };
+}
+
+function pruneExpiredDepartureAlerts() {
+  const now = Date.now();
+  let changed = false;
+  Object.entries(state.settings.selectedDepartureAlertsByRoute || {}).forEach(([routeId, bucket]) => {
+    Object.entries(bucket).forEach(([key, alert]) => {
+      if (Number(alert.targetAt) + 60000 < now) {
+        delete bucket[key];
+        changed = true;
+      }
+    });
+    if (!Object.keys(bucket).length) delete state.settings.selectedDepartureAlertsByRoute[routeId];
+  });
+  if (changed) {
+    state.alertRevision += 1;
+    saveSettings();
+  }
 }
 
 function commuteGuidance(route, stopIndex, next) {
@@ -442,6 +484,7 @@ function renderShell() {
 
 function renderHome() {
   const route = activeRoute();
+  pruneExpiredDepartureAlerts();
   if (!route) {
     state.homeRenderKey = "";
     state.countdownText = "";
@@ -453,6 +496,7 @@ function renderHome() {
     els.nextTime.textContent = "--:--";
     els.countdown.textContent = "Upload a route to begin";
     els.countdownProgressFill.style.width = "0%";
+    els.commuteAdvice.classList.remove("compact");
     els.commuteAdvice.innerHTML = `<strong>No route yet.</strong><span>Upload a PDF to start.</span>`;
     els.routeMap.innerHTML = "";
     els.arrivalList.innerHTML = "";
@@ -479,6 +523,7 @@ function renderHome() {
     els.nextTime.textContent = "--:--";
     els.countdown.textContent = "No times found for this stop";
     els.countdownProgressFill.style.width = "0%";
+    els.commuteAdvice.classList.remove("compact");
     els.commuteAdvice.innerHTML = `<strong>No departure found.</strong><span>Try another stop or update the PDF.</span>`;
     els.routeMap.innerHTML = renderRouteMap(route);
     els.arrivalList.innerHTML = "";
@@ -492,6 +537,7 @@ function renderHome() {
   }
 
   els.nextTime.textContent = next.row[state.activeStopIndex];
+  els.distanceReadout.textContent = `Next bus leaves here at ${next.row[state.activeStopIndex]}`;
   document.body.dataset.homeState = next.waitSeconds <= 600 ? "soon" : "calm";
   const countdownText = formatCountdown(next.waitSeconds);
   if (state.countdownText !== countdownText) {
@@ -501,7 +547,8 @@ function renderHome() {
   const progress = Math.max(3, Math.min(100, 100 - (next.waitSeconds / 3600) * 100));
   els.countdownProgressFill.style.width = `${progress}%`;
 
-  const staticKey = `${route.id}|${state.activeStopIndex}|${next.index}|${next.targetAt}|${next.wait}|${state.currentPosition ? "gps" : "nogps"}`;
+  const alertSignature = Object.keys(selectedAlertBucket(route.id)).sort().join(",");
+  const staticKey = `${route.id}|${state.activeStopIndex}|${next.index}|${next.targetAt}|${next.wait}|${state.currentPosition ? "gps" : "nogps"}|${state.alertRevision}|${alertSignature}`;
   if (state.homeRenderKey === staticKey) return;
   state.homeRenderKey = staticKey;
 
@@ -513,26 +560,39 @@ function renderHome() {
 
   const guidance = commuteGuidance(route, state.activeStopIndex, next);
   els.commuteAdvice.dataset.state = guidance.state;
-  els.commuteAdvice.innerHTML = `<strong>${escapeHTML(guidance.state)}: ${escapeHTML(guidance.title)}</strong><span>${escapeHTML(guidance.detail)}</span>`;
+  els.commuteAdvice.classList.toggle("compact", guidance.state === "Set location");
+  els.commuteAdvice.innerHTML = guidance.state === "Set location"
+    ? `<a href="#/settings">Set stop location</a>`
+    : `<strong>${escapeHTML(guidance.state)}: ${escapeHTML(guidance.title)}</strong><span>${escapeHTML(guidance.detail)}</span>`;
   els.routeMap.innerHTML = renderRouteMap(route);
-  els.arrivalList.innerHTML = route.stops
+  const arrivalCards = route.stops
     .slice(state.activeStopIndex + 1)
-    .map((stop) => {
+    .map((stop, downstreamIndex) => {
       const arrival = next.row[stop.index];
       const rideMinutes = normalizeArrival(next.row, stop.index, next.minutes) - next.minutes;
-      return `<div><span>${escapeHTML(stop.name)}</span><strong>${arrival}</strong><small>${rideMinutes} min ride</small></div>`;
+      return `<div class="${downstreamIndex === 0 ? "next-arrival" : ""}"><span>${downstreamIndex === 0 ? "Next stop: " : ""}${escapeHTML(stop.name)}</span><strong>${arrival}</strong><small>${rideMinutes} min ride</small></div>`;
     })
     .join("") || `<div><span>End of route</span><strong>${next.row[state.activeStopIndex]}</strong><small>No downstream stops</small></div>`;
+  els.arrivalList.innerHTML = `<h3 class="mini-heading">Next stops</h3>${arrivalCards}`;
 
   els.upcomingGrid.innerHTML = getTimedRows(route, state.activeStopIndex)
     .slice(0, 5)
-    .map(({ row, wait }) => `
-      <article>
+    .map((timed) => {
+      const { row, wait } = timed;
+      const key = departureAlertKey(route.id, state.activeStopIndex, timed);
+      const armed = Boolean(selectedAlertBucket(route.id)[key]);
+      return `
+      <article class="${armed ? "armed" : ""}">
         <span>${escapeHTML(activeStop?.shortName || activeStop?.name || "Stop")}</span>
         <strong>${row[state.activeStopIndex]}</strong>
-        <small>${formatDuration(wait)}</small>
+        <div class="departure-actions">
+          <small>${formatDuration(wait)}</small>
+          <button class="alarm-button ${armed ? "active" : ""}" type="button" data-alert-key="${escapeHTML(key)}" aria-label="${armed ? "Remove" : "Set"} reminder for ${row[state.activeStopIndex]}">
+            ${armed ? "Alarm set" : "Alarm"}
+          </button>
+        </div>
       </article>
-    `)
+    `; })
     .join("");
 }
 
@@ -540,18 +600,22 @@ function renderRouteMap(route) {
   if (!route) return "";
   const bucket = locationBucket(route.id);
   const stops = route.stops;
-  const pulseLeft = route.stops.length > 1
+  const pulseStart = route.stops.length > 1
     ? Math.min(100, Math.max(0, (state.activeStopIndex / (route.stops.length - 1)) * 100))
+    : 0;
+  const pulseEnd = route.stops.length > 1
+    ? Math.min(100, Math.max(0, (Math.min(route.stops.length - 1, state.activeStopIndex + 1) / (route.stops.length - 1)) * 100))
     : 0;
   return `
     <div class="route-line" style="--stops:${stops.length}">
-      <b class="route-pulse" style="--pulse-left:${pulseLeft}%"></b>
+      <b class="route-pulse" style="--pulse-left-start:${pulseStart}%; --pulse-left-end:${pulseEnd}%"></b>
       ${stops.map((stop) => {
         const hasLocation = Boolean(bucket[stop.id]);
         const active = stop.index === state.activeStopIndex;
         const passed = stop.index < state.activeStopIndex;
+        const downstream = stop.index > state.activeStopIndex;
         return `
-          <div class="route-stop ${active ? "active" : ""} ${passed ? "passed" : ""} ${hasLocation ? "located" : ""}">
+          <div class="route-stop ${active ? "active" : ""} ${passed ? "passed" : ""} ${downstream ? "downstream" : ""} ${hasLocation ? "located" : ""}">
             <i></i>
             <span>${escapeHTML(stop.shortName || stop.name)}</span>
           </div>
@@ -640,7 +704,10 @@ function renderSchedule() {
     <th>${index === 0 ? "Depart " : ""}${escapeHTML(stop.shortName || stop.name)}</th>
   `).join("")}</tr>`;
   els.scheduleBody.innerHTML = route.rows.map((row) => `
-    <tr>${row.map((time) => `<td>${time}</td>`).join("")}</tr>
+    <tr>${row.map((time, index) => {
+      const label = `${index === 0 ? "Depart " : ""}${route.stops[index]?.shortName || route.stops[index]?.name || `Stop ${index + 1}`}`;
+      return `<td data-label="${escapeHTML(label)}">${time}</td>`;
+    }).join("")}</tr>
   `).join("");
 }
 
@@ -699,8 +766,6 @@ function renderCommutePrefs(route) {
   els.bufferMinutes.value = prefs.bufferMinutes;
   const selected = new Set(prefs.reminderMinutes || DEFAULT_COMMUTE_PREFS.reminderMinutes);
   [
-    els.reminderThirty,
-    els.reminderTwenty,
     els.reminderTen,
     els.reminderFive,
     els.reminderTwo
@@ -724,8 +789,6 @@ async function saveCommutePrefs() {
   prefs.walkingSpeed = Math.max(30, Math.min(140, Number(els.walkingSpeed.value) || DEFAULT_COMMUTE_PREFS.walkingSpeed));
   prefs.bufferMinutes = Math.max(0, Math.min(20, Number(els.bufferMinutes.value) || 0));
   prefs.reminderMinutes = [
-    els.reminderThirty,
-    els.reminderTwenty,
     els.reminderTen,
     els.reminderFive,
     els.reminderTwo
@@ -1038,6 +1101,7 @@ async function deleteRoute(routeId) {
   if (!route || !window.confirm(`Delete ${route.name}? This removes its saved timetable and stop locations from this browser.`)) return;
   await idbDelete(ROUTE_STORE, routeId);
   delete state.settings.stopLocationsByRoute[routeId];
+  delete state.settings.selectedDepartureAlertsByRoute?.[routeId];
   await saveSettings();
   state.routes = state.routes.filter((item) => item.id !== routeId);
   if (state.activeRouteId === routeId) setActiveRoute(state.routes[0]?.id || null);
@@ -1424,25 +1488,47 @@ async function enableNotifications() {
     : "Notifications not enabled. In-app alerts still work while open.";
 }
 
+async function toggleDepartureAlert(key) {
+  const route = activeRoute();
+  if (!route) return;
+  const bucket = selectedAlertBucket(route.id);
+  if (bucket[key]) {
+    delete bucket[key];
+  } else {
+    const timed = getTimedRows(route, state.activeStopIndex).find((candidate) => departureAlertKey(route.id, state.activeStopIndex, candidate) === key);
+    if (!timed) return;
+    bucket[key] = makeDepartureAlert(route, state.activeStopIndex, timed);
+  }
+  state.alertRevision += 1;
+  await saveSettings();
+  renderHome();
+}
+
 function maybeInAppAlert() {
+  pruneExpiredDepartureAlerts();
+  const alerts = Object.values(state.settings.selectedDepartureAlertsByRoute || {}).flatMap((bucket) => Object.values(bucket));
+  alerts.forEach((alert) => {
+    activeReminderMinutes(alert.routeId).forEach((minute) => {
+      if (alert.firedMinutes?.includes(minute)) return;
+      const secondsUntil = Math.ceil((Number(alert.targetAt) - Date.now()) / 1000);
+      const targetSeconds = minute * 60;
+      if (secondsUntil > targetSeconds || secondsUntil < targetSeconds - 5) return;
+      if (!Array.isArray(alert.firedMinutes)) alert.firedMinutes = [];
+      alert.firedMinutes.push(minute);
+      if (navigator.vibrate) navigator.vibrate([90, 60, 90]);
+      const body = `${alert.routeName} from ${alert.stopName} departs at ${alert.departTime}.`;
+      if (state.settings.notificationPrefs?.enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification(`${minute} min until your bus`, { body });
+      } else {
+        showInAppAlert(`${minute} min until your bus`, body);
+      }
+      saveSettings();
+    });
+  });
+
   const route = activeRoute();
   const next = route ? getTimedRows(route, state.activeStopIndex)[0] : null;
   if (!route || !next) return;
-
-  activeReminderMinutes(route.id).forEach((minute) => {
-    const targetSeconds = minute * 60;
-    if (next.waitSeconds > targetSeconds || next.waitSeconds < targetSeconds - 5) return;
-    const reminderKey = `${route.id}-${state.activeStopIndex}-${next.index}-${next.targetAt}-${minute}`;
-    if (state.lastReminderKey === reminderKey) return;
-    state.lastReminderKey = reminderKey;
-    if (navigator.vibrate) navigator.vibrate([90, 60, 90]);
-    const body = `${route.name} from ${route.stops[state.activeStopIndex]?.shortName || route.stops[state.activeStopIndex]?.name || "your stop"} departs at ${next.row[state.activeStopIndex]}.`;
-    if (state.settings.notificationPrefs?.enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification(`${minute} min until your bus`, { body });
-    } else {
-      showInAppAlert(`${minute} min until your bus`, body);
-    }
-  });
 
   const guidance = commuteGuidance(route, state.activeStopIndex, next);
   if (!["Leave now", "You may miss this"].includes(guidance.state)) return;
@@ -1501,6 +1587,10 @@ function wireEvents() {
     els.distanceReadout.textContent = "Selected manually";
     rememberStop(state.activeRouteId, state.activeStopIndex);
     renderAll();
+  });
+  els.upcomingGrid.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-alert-key]");
+    if (button) toggleDepartureAlert(button.dataset.alertKey);
   });
   els.routeList.addEventListener("click", async (event) => {
     const select = event.target.closest("[data-select-route]");
@@ -1563,8 +1653,6 @@ function wireEvents() {
   [
     els.walkingSpeed,
     els.bufferMinutes,
-    els.reminderThirty,
-    els.reminderTwenty,
     els.reminderTen,
     els.reminderFive,
     els.reminderTwo
