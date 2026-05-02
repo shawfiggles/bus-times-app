@@ -90,51 +90,6 @@ a {
   text-decoration: none;
 }
 
-.icon {
-  width: 1.05em;
-  height: 1.05em;
-  flex: 0 0 auto;
-  stroke: currentColor;
-  stroke-width: 2.1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
-  vertical-align: -0.16em;
-}
-
-.brand .icon,
-.route-pill .icon,
-.home-meta .icon,
-.section-heading .icon,
-.eyebrow .icon,
-.button .icon,
-.alarm-button .icon,
-.meta-icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.icon-line,
-[data-icon],
-.route-pill,
-.home-meta > span,
-.section-heading a,
-.health-list span,
-.route-preview span,
-.review-meta > span,
-.arrival-list span,
-.upcoming-grid article > span,
-.route-card small,
-.commute-advice strong,
-.commute-advice.compact a,
-.location-list strong,
-.location-list .copy-suggestion,
-.search-results strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
 button,
 label,
 input,
@@ -212,10 +167,10 @@ label {
 }
 
 .route-pill,
-.panel-topline > span,
-.home-meta > span,
+.panel-topline span,
+.home-meta span,
 .section-heading a,
-.review-meta > span {
+.review-meta span {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
@@ -308,7 +263,6 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   min-height: 48px;
   padding: 0 18px;
   border: 1px solid var(--line);
@@ -632,11 +586,6 @@ p {
   color: var(--muted);
 }
 
-.arrival-list .next-arrival .icon,
-.upcoming-grid article.armed .icon {
-  color: var(--green);
-}
-
 .arrival-list strong {
   font-size: 1.2rem;
 }
@@ -744,10 +693,6 @@ p {
 }
 
 .alarm-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
   min-height: 30px;
   padding: 0 8px;
   border: 1px solid rgba(55, 213, 255, 0.36);
@@ -762,7 +707,6 @@ p {
   border-color: rgba(119, 224, 162, 0.72);
   background: rgba(119, 224, 162, 0.18);
   color: var(--green);
-  box-shadow: 0 0 18px rgba(119, 224, 162, 0.18);
 }
 
 .route-card {
@@ -904,20 +848,11 @@ p {
 }
 
 .upload-icon {
-  display: grid;
-  place-items: center;
   width: 62px;
   aspect-ratio: 1;
   border-radius: 8px;
   background: linear-gradient(135deg, var(--cyan), var(--green));
-  color: #07111f;
   box-shadow: 0 0 34px rgba(55, 213, 255, 0.25);
-}
-
-.upload-icon .icon {
-  width: 32px;
-  height: 32px;
-  stroke-width: 2.4;
 }
 
 .review-meta,
@@ -1086,16 +1021,6 @@ td {
   gap: 8px;
 }
 
-.nudge-grid button {
-  display: grid;
-  place-items: center;
-}
-
-.nudge-grid .icon {
-  width: 1.2rem;
-  height: 1.2rem;
-}
-
 .bottom-nav {
   position: fixed;
   left: 50%;
@@ -1115,31 +1040,12 @@ td {
 .bottom-nav a {
   display: grid;
   place-items: center;
-  gap: 4px;
   min-height: 46px;
   border: 1px solid transparent;
   border-radius: 8px;
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 900;
-}
-
-.bottom-nav .icon {
-  width: 1.14rem;
-  height: 1.14rem;
-}
-
-.bottom-nav a.active .icon {
-  color: var(--cyan);
-  filter: drop-shadow(0 0 10px rgba(55, 213, 255, 0.46));
-}
-
-.schedule-label {
-  display: none;
-}
-
-.schedule-time {
-  font-variant-numeric: tabular-nums;
 }
 
 .toast-alert {
@@ -1235,29 +1141,6 @@ td {
     text-overflow: ellipsis;
   }
 
-  #view-schedule .page-heading {
-    display: grid;
-    gap: 6px;
-    padding: 12px 0 10px;
-  }
-
-  #view-schedule .eyebrow {
-    margin-bottom: 2px;
-    font-size: 0.66rem;
-  }
-
-  #view-schedule h1 {
-    margin-bottom: 0;
-    font-size: clamp(2rem, 11vw, 3.1rem);
-    line-height: 0.98;
-  }
-
-  #schedule-summary {
-    margin-bottom: 4px;
-    font-size: 0.9rem;
-    line-height: 1.35;
-  }
-
   .quick-actions,
   .settings-grid,
   .map-controls,
@@ -1315,9 +1198,9 @@ td {
 
   #schedule-table tr {
     display: grid;
-    gap: 5px;
-    margin-bottom: 9px;
-    padding: 8px;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 8px;
     background:
@@ -1329,9 +1212,9 @@ td {
   #schedule-table td {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
+    gap: 10px;
     align-items: baseline;
-    padding: 6px 8px;
+    padding: 8px 10px;
     border: 0;
     border-radius: 8px;
     background: rgba(7, 14, 25, 0.4);
@@ -1340,22 +1223,12 @@ td {
   }
 
   #schedule-table td::before {
-    content: none;
-  }
-
-  .schedule-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    content: attr(data-label);
     color: var(--soft);
-    font-size: 0.67rem;
+    font-size: 0.72rem;
     font-weight: 900;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-  }
-
-  .schedule-time {
-    font-size: 0.96rem;
   }
 
   #schedule-table td:first-child {
